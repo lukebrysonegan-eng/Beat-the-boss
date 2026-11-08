@@ -1,0 +1,779 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>[hidden]{display:none!important}body{margin:0}</style></head><body>
+<title>Ember Forge</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Chakra+Petch:wght@400;600;700&display=swap">
+<style>
+/* Layout: one-screen arcade cabinet — stats bar on top, anvil and boss gate side by side, upgrade sections below. Fights open a full-screen top-down boss room you walk around in. Single dark forge look. */
+:root{
+  --bg:#1a1216; --panel:#271b20; --line:#3d2a31; --fg:#f5e9df; --muted:#b39c92;
+  --ember:#ff8a3d; --ember-deep:#d4461f; --gold:#ffd166; --good:#7bd88f; --bad:#ff5d6c; --ice:#7fd3f5;
+  --display:"Bungee", "Impact", system-ui, sans-serif;
+  --body:"Chakra Petch", ui-sans-serif, system-ui, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 32px;
+  background-image:radial-gradient(ellipse at 50% -10%, #3a1d1a 0%, transparent 60%);}
+.wrap{max-width:1040px;margin:0 auto;display:grid;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(26px,5vw,40px);margin:0;letter-spacing:.02em;
+  color:var(--ember);text-shadow:0 2px 0 var(--ember-deep),0 0 24px #ff8a3d55}
+.stats{display:flex;flex-wrap:wrap;gap:8px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px;min-width:96px}
+.stat b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
+.stat.coin b{color:var(--gold)}
+.main{display:grid;grid-template-columns:1fr 1.3fr;gap:14px}
+@media (max-width:720px){.main{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;min-width:0;position:relative;overflow:hidden}
+.card h2{font-family:var(--display);font-weight:400;font-size:16px;margin:0 0 10px;letter-spacing:.04em;color:var(--muted)}
+.forge{display:grid;place-items:center;gap:10px;text-align:center}
+#anvil{width:190px;height:190px;border-radius:50%;border:none;cursor:pointer;font-family:var(--display);font-size:22px;color:#2a120a;
+  --a1:var(--gold);--a2:var(--ember);--a3:var(--ember-deep);--ash:#7a2410;--glow:#ff8a3d66;
+  background:radial-gradient(circle at 35% 30%,var(--a1),var(--a2) 55%,var(--a3));
+  box-shadow:0 8px 0 var(--ash),0 0 40px var(--glow);transition:transform .06s,background .4s}
+#anvil:active{transform:translateY(5px) scale(.97);box-shadow:0 3px 0 var(--ash),0 0 50px var(--glow)}
+#tierName{font-family:var(--display);font-size:18px;letter-spacing:.03em}
+#tierPerk{font-size:13px;color:var(--muted)}
+.evo{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.tier{display:grid;justify-items:center;gap:4px;padding:12px 8px;text-align:center}
+.tier .orb{width:44px;height:44px;border-radius:50%;box-shadow:0 3px 0 #0006}
+.tier .tn{font-size:14px}
+.tier small{font-weight:400;color:var(--muted);font-size:12px}
+.tier .c{color:var(--gold);font-variant-numeric:tabular-nums}
+.tier.owned{background:#24402b;border-color:#3b6b47}
+.tier.owned .c{color:var(--good)}
+.tier.locked{opacity:.4}
+.tier.next{border-color:var(--ember)}
+#anvil:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:3px}
+.hint{color:var(--muted);font-size:13px}
+.float{position:absolute;pointer-events:none;font-weight:700;font-size:18px;color:var(--gold);animation:up .9s ease-out forwards;text-shadow:0 2px 0 #0008;z-index:3;white-space:nowrap}
+.float.dmg{color:var(--fg)} .float.crit{color:var(--bad);font-size:24px} .float.power{color:var(--gold);font-family:var(--display);font-size:26px}
+.float.hurt{color:var(--bad);font-family:var(--display);font-size:20px}
+@keyframes up{to{transform:translateY(-60px);opacity:0}}
+.arena-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+#bossName{font-family:var(--display);font-size:20px}
+#bossTier{color:var(--muted);font-size:13px}
+canvas{display:block;width:100%;max-width:100%;height:auto;aspect-ratio:5/3;border-radius:10px;background:#140d10}
+#cv{margin-block:8px;cursor:pointer}
+.bar{height:16px;background:#140d10;border:1px solid var(--line);border-radius:8px;overflow:hidden;position:relative}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--bad),#ff8a8a);transition:width .1s}
+.bar.me i{background:linear-gradient(90deg,#3fae5a,var(--good))}
+.bar.time i{background:linear-gradient(90deg,var(--gold),var(--ember))}
+.bar.time.frozen i{background:linear-gradient(90deg,#c9f1ff,var(--ice))}
+.bar em{position:absolute;inset:0;display:grid;place-items:center;font-style:normal;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+button{font-family:var(--body);font-weight:700;font-size:14px;border-radius:10px;border:1px solid var(--line);background:#33242a;color:var(--fg);padding:10px 14px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--ember)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.go{background:var(--ember);color:#2a120a;border-color:var(--ember)}
+#msg{min-height:20px;font-weight:600}
+.shop{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.up{display:grid;grid-template-columns:1fr auto;gap:2px 10px;text-align:left;padding:12px}
+.up .n{font-size:15px}
+.up .d{grid-column:1;font-weight:400;font-size:12px;color:var(--muted)}
+.up .c{grid-row:1/3;grid-column:2;align-self:center;color:var(--gold);font-variant-numeric:tabular-nums}
+.up .lv{font-weight:400;color:var(--muted);font-size:12px}
+.up.power .n{color:var(--gold)}
+.bosses{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:12px;padding:6px 10px;border-radius:999px}
+.chip.done{background:#24402b;border-color:#3b6b47;color:var(--good)}
+.chip.sel{border-color:var(--ember);color:var(--ember)}
+#rebirth{display:none}
+.overlay{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:20;padding:16px}
+.overlay .card{max-width:380px;text-align:center}
+.overlay h3{font-family:var(--display);font-weight:400;font-size:26px;margin:0 0 8px;color:var(--gold)}
+
+/* Boss room */
+.room{position:fixed;inset:0;z-index:15;background:var(--bg);overflow-y:auto;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.room{overflow:hidden}
+.room-in{height:100%;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto;gap:6px;padding-block:8px;position:relative}
+.stage{min-height:0;min-width:0;position:relative}
+#rcv{position:absolute;inset:0;width:100%;height:100%;aspect-ratio:auto;object-fit:contain;background:transparent;border-radius:0;cursor:crosshair;touch-action:none;user-select:none;-webkit-user-select:none}
+.bottom{display:flex;flex-wrap:wrap;gap:6px}
+.bottom>*{flex:1 1 110px}
+.bottom .ctrl{display:contents}
+#roomHint{font-size:12px}
+@media (max-height:560px){#roomHint{display:none}}
+.room-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.room-top .eyebrow{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)}
+#roomBoss{font-family:var(--display);font-size:clamp(18px,4vw,28px);line-height:1.1}
+.bars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+@media (max-width:560px){.bars{grid-template-columns:1fr}}
+.ctrl button{padding:12px;font-family:var(--display);font-weight:400;font-size:16px;touch-action:manipulation;flex:1 1 110px}
+.powers{display:contents}
+.pw{position:relative;overflow:hidden;display:grid;gap:2px;text-align:center;padding:10px 8px;border-color:#6b4a2a;touch-action:manipulation}
+.pw{flex:1 1 78px;padding:8px 4px;font-size:13px}
+.pw .pn{color:var(--gold)}
+.pw small{font-weight:400;font-size:11px;color:var(--muted)}
+.pw .cdv{position:absolute;inset:0;background:#000b;transform-origin:bottom;transform:scaleY(var(--p,0));pointer-events:none}
+.pw .cdt{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-size:20px;pointer-events:none}
+.pw:disabled{opacity:1}
+@media (prefers-reduced-motion:reduce){.float{animation-duration:.01s}#anvil{transition:none}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Ember Forge</h1>
+    <div class="stats">
+      <div class="stat coin"><span>Coins</span><b id="sCoins">0</b></div>
+      <div class="stat"><span>Per tap</span><b id="sTap">1</b></div>
+      <div class="stat"><span>Per sec</span><b id="sSec">0</b></div>
+      <div class="stat"><span>Damage</span><b id="sDmg">1</b></div>
+      <div class="stat"><span>Rebirths</span><b id="sReb">0</b></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <section class="card forge" id="forgeCard">
+      <h2>The Anvil</h2>
+      <div id="tierName">Stone Anvil</div>
+      <button id="anvil" aria-label="Strike the anvil for coins">STRIKE</button>
+      <div id="tierPerk"></div>
+      <div class="hint">Tap the anvil to earn coins. Spend them on gear and powers, then fight.</div>
+      <div class="hint" id="trophyLine"></div>
+    </section>
+
+    <section class="card" id="arenaCard">
+      <h2>Boss Gate</h2>
+      <div class="arena-top"><span id="bossName">Mudling</span><span id="bossTier">Boss 1 of 10</span></div>
+      <canvas id="cv" width="600" height="360" aria-label="Preview of the boss room"></canvas>
+      <div class="hint" id="gateInfo"></div>
+      <div class="row">
+        <button class="go" id="fight">Enter boss room</button>
+        <button id="rebirth">Rebirth</button>
+      </div>
+      <div id="msg" class="hint" style="margin-top:8px"></div>
+      <div class="bosses" id="bossList" style="margin-top:8px"></div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Super Powers</h2>
+    <div class="hint" style="margin-bottom:10px">Unlock powers here, then use them inside the boss room. Each level makes a power stronger.</div>
+    <div class="shop" id="powerShop"></div>
+  </section>
+
+  <section class="card">
+    <h2>Clicker Upgrades</h2>
+    <div class="hint" style="margin-bottom:10px">Turn your anvil into a stronger clicker. Each form multiplies coins per tap, and later forms strike on their own.</div>
+    <div class="evo" id="evoList"></div>
+  </section>
+
+  <section class="card">
+    <h2>Upgrade Rack</h2>
+    <div class="shop" id="shop"></div>
+  </section>
+  <div class="hint" style="text-align:center"><span id="saveNote">Progress saves in this browser.</span> <button id="reset" style="padding:4px 10px;font-size:12px">Wipe save</button></div>
+</div>
+
+<div class="room" id="room" hidden>
+  <div class="room-in" id="roomIn">
+    <div class="room-top">
+      <div><div class="eyebrow" id="roomName">The Mud Pit</div><div id="roomBoss">Mudling</div></div>
+      <button id="flee">Run away</button>
+    </div>
+    <div class="bars">
+      <div class="bar"><i id="hpBar" style="width:100%"></i><em id="hpTxt"></em></div>
+      <div class="bar me"><i id="meBar" style="width:100%"></i><em id="meTxt"></em></div>
+      <div class="bar time" id="tBarWrap"><i id="tBar" style="width:100%"></i><em id="tTxt"></em></div>
+    </div>
+    <div class="stage"><canvas id="rcv" width="900" height="540" aria-label="Boss room — move your hero and attack the boss"></canvas></div>
+    <div class="bottom"><div class="ctrl"><button class="go" id="btnAtk">Attack</button><button id="btnDash">Dash</button></div><div class="powers" id="powerBar"></div></div>
+    <div class="hint" id="roomHint"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+const BOSSES=[
+ {n:"Mudling",c:"#8a6a4a",e:0},{n:"Rust Golem",c:"#b5653a",e:1},{n:"Bog Witch",c:"#5f8f4e",e:2},
+ {n:"Cinder Hound",c:"#e0582b",e:1},{n:"Frost Warden",c:"#6fb6d9",e:3},{n:"Storm Hydra",c:"#7b6cf0",e:2},
+ {n:"Iron Colossus",c:"#8d97a3",e:3},{n:"Void Wyrm",c:"#a23fd0",e:2},{n:"Sun Eater",c:"#ffc23d",e:3},{n:"The Ashen King",c:"#e8e1d6",e:3},
+ {n:"Ember Titan",c:"#ff6a3d",e:3},{n:"Coral Leviathan",c:"#ff7f9e",e:2},{n:"Clockwork Tyrant",c:"#c9a24a",e:3},
+ {n:"Shadow Twin",c:"#4a4466",e:1},{n:"Crystal Queen",c:"#b8f0ff",e:2},{n:"Plague Toad",c:"#9fbf3a",e:3},
+ {n:"Thunder Roc",c:"#ffe14d",e:1},{n:"Bone Dragon",c:"#e6dcc8",e:3},{n:"Nebula Beast",c:"#6a5cff",e:3},{n:"The Forge God",c:"#ff9a3d",e:3}
+];
+// Each boss has its own room: wall color, floor colors, torch light, floating particles, pillar layout.
+const ROOMS=[
+ {n:"The Mud Pit",w:"#3d2e20",f:["#4a3826","#3f2f20"],light:"#ffb35c",p:"bubble",pc:"#a88a5c",pil:0},
+ {n:"Rusted Foundry",w:"#4a2c1f",f:["#3b2a24","#33241f"],light:"#ff7a3d",p:"spark",pc:"#ffb070",pil:1},
+ {n:"Witch's Bog",w:"#20402a",f:["#1d3323","#182b1d"],light:"#8cff7a",p:"bubble",pc:"#9be08a",pil:2},
+ {n:"Cinder Den",w:"#5a1c0f",f:["#3a1510","#2f110c"],light:"#ff5a1f",p:"ember",pc:"#ffa040",pil:1},
+ {n:"Frozen Hall",w:"#244a66",f:["#8fbfd8","#7fb0ca"],light:"#9fe6ff",p:"snow",pc:"#ffffff",pil:2},
+ {n:"Storm Peak",w:"#2c2552",f:["#2a2840","#232136"],light:"#b9a8ff",p:"spark",pc:"#d8ccff",pil:0},
+ {n:"Iron Vault",w:"#323941",f:["#3a4048","#31363d"],light:"#ffe0a0",p:"spark",pc:"#ffd890",pil:2},
+ {n:"The Void Rift",w:"#1e0d33",f:["#1a0f2a","#140b21"],light:"#c46bff",p:"star",pc:"#e6c8ff",pil:1},
+ {n:"Sun Temple",w:"#6b4410",f:["#8a6420","#7a571b"],light:"#ffe066",p:"ember",pc:"#fff0a0",pil:2},
+ {n:"Ashen Throne",w:"#3a3434",f:["#2e2a2a","#262222"],light:"#ffd166",p:"ash",pc:"#b8b0a8",pil:1},
+ {n:"Magma Core",w:"#6a1a08",f:["#4a120a","#3d0f08"],light:"#ff4a1a",p:"ember",pc:"#ffb060",pil:1},
+ {n:"Sunken Reef",w:"#0f3a4a",f:["#1a5a66","#164e59"],light:"#6ff0e0",p:"bubble",pc:"#c8fff6",pil:2},
+ {n:"Gear Works",w:"#4a3a1c",f:["#3a3226","#322b20"],light:"#ffcf6a",p:"spark",pc:"#ffe0a0",pil:1},
+ {n:"Mirror Hall",w:"#2a2638",f:["#1e1b2a","#191624"],light:"#a59bff",p:"star",pc:"#ffffff",pil:2},
+ {n:"Crystal Cavern",w:"#2a4a5a",f:["#9fd8e8","#8ccbdc"],light:"#c8f6ff",p:"star",pc:"#ffffff",pil:1},
+ {n:"Toxic Swamp",w:"#2e3d10",f:["#3a4a14","#323f11"],light:"#c6ff3d",p:"bubble",pc:"#d6ff7a",pil:0},
+ {n:"Sky Nest",w:"#4a5a7a",f:["#8aa0c0","#7c92b2"],light:"#fff07a",p:"spark",pc:"#ffffff",pil:0},
+ {n:"Bone Crypt",w:"#3a332a",f:["#2a2620","#23201b"],light:"#9fffd0",p:"ash",pc:"#e6dcc8",pil:2},
+ {n:"Starfall Void",w:"#120a2a",f:["#0e0820","#0b061a"],light:"#8a7cff",p:"star",pc:"#ffffff",pil:1},
+ {n:"The Great Forge",w:"#5a2a10",f:["#3a1d10","#30180d"],light:"#ff9a3d",p:"ember",pc:"#ffd166",pil:2}
+];
+const PILLARS=[
+ [],
+ [[210,170],[690,170],[210,370],[690,370]],
+ [[300,270],[600,270]]
+];
+const bossHp=i=>Math.round(30*Math.pow(5.2,i));
+const bossReward=i=>Math.round(bossHp(i)*1.2+20);
+
+const UPS=[
+ {id:"glove",n:"Forge Gloves",d:"+1 coin per tap",base:12,g:1.22},
+ {id:"bellows",n:"Bellows",d:"+1 coin per second",base:40,g:1.25},
+ {id:"apprentice",n:"Apprentice",d:"+8 coins per second",base:600,g:1.3},
+ {id:"str",n:"Strength Training",d:"+2 damage",base:20,g:1.22},
+ {id:"blade",n:"Blade Tier",d:"Doubles all damage",base:350,g:6},
+ {id:"charm",n:"Lucky Charm",d:"+5% crit chance (crits hit x3)",base:250,g:2.2,max:10},
+ {id:"glass",n:"Hourglass",d:"+3 seconds per fight",base:300,g:2.4,max:10},
+ {id:"armor",n:"Armor Plate",d:"Take 12% less damage from bosses",base:150,g:1.9,max:12},
+ {id:"vit",n:"Heart Forge",d:"+20 max HP in boss fights",base:100,g:1.45},
+ {id:"boots",n:"Swift Boots",d:"+8% move speed",base:120,g:1.8,max:10},
+ {id:"hammer",n:"Golden Hammer",d:"Doubles coins per tap",base:2000,g:7}
+];
+
+const TIERS=[
+ {n:"Stone Anvil",cost:0,mult:1,auto:0,c:["#cfc6bd","#8f857c","#5a524c"],ash:"#2e2926",glow:"#ffffff22"},
+ {n:"Iron Anvil",cost:150,mult:3,auto:0,c:["#e2e8ee","#8d97a3","#4b535c"],ash:"#262b31",glow:"#c9d6e355"},
+ {n:"Blazing Anvil",cost:2500,mult:8,auto:1,c:["#ffd166","#ff8a3d","#d4461f"],ash:"#7a2410",glow:"#ff8a3d77"},
+ {n:"Golden Anvil",cost:40000,mult:25,auto:2,c:["#fff4c2","#ffcf3d","#b8860b"],ash:"#6b4e05",glow:"#ffd16688"},
+ {n:"Frost Anvil",cost:600000,mult:80,auto:4,c:["#f0fbff","#7fd3f5","#2b7fb0"],ash:"#123f5c",glow:"#7fd3f588"},
+ {n:"Mythril Anvil",cost:1e7,mult:300,auto:6,c:["#e9fff4","#5ef0b0","#16956a"],ash:"#0b4a35",glow:"#5ef0b088"},
+ {n:"Void Anvil",cost:2e8,mult:1200,auto:8,c:["#f1d6ff","#b45cf0","#5a1a8f"],ash:"#2c0a47",glow:"#b45cf099"},
+ {n:"Star Anvil",cost:5e9,mult:6000,auto:12,c:["#ffffff","#ffe9a8","#ff7ad1"],ash:"#6e2a57",glow:"#fff3c4aa"}
+];
+
+const pm=lv=>1+0.5*(Math.max(1,lv)-1);
+const POWERS=[
+ {id:"fist",n:"Fire Fist",k:"1",cd:8,base:400,g:3,d:lv=>`Throws a fireball for ${fmt(40*pm(lv))}x your damage`},
+ {id:"bolt",n:"Lightning Storm",k:"2",cd:14,base:4000,g:3,d:lv=>`8 bolts, each ${fmt(8*pm(lv))}x your damage`},
+ {id:"freeze",n:"Time Freeze",k:"3",cd:25,base:20000,g:3,max:5,d:lv=>`Freezes the boss and timer for ${3+2*Math.max(1,lv)}s`},
+ {id:"rage",n:"Rage Mode",k:"4",cd:20,base:100000,g:3,d:lv=>`Hit x${2+Math.max(1,lv)} harder and move faster for 6s`},
+ {id:"meteor",n:"Meteor Strike",k:"5",cd:40,base:1500000,g:3,d:lv=>`A meteor for ${fmt(250*pm(lv))}x your damage`},
+ {id:"heal",n:"Healing Light",k:"6",cd:18,base:1500,g:3,max:6,d:lv=>`Heals ${30+10*(Math.max(1,lv)-1)}% of your max HP`},
+ {id:"shield",n:"Shield Bubble",k:"7",cd:22,base:8000,g:3,max:6,d:lv=>`Nothing can hurt you for ${(3+0.5*(Math.max(1,lv)-1)).toFixed(1)}s`},
+ {id:"clones",n:"Shadow Clones",k:"8",cd:24,base:50000,g:3,max:5,d:lv=>`${1+Math.max(1,lv)} clones attack the boss for 6s`},
+ {id:"ice",n:"Ice Spikes",k:"9",cd:16,base:300000,g:3,d:lv=>`${fmt(20*pm(lv))}x damage and slows the boss for 5s`},
+ {id:"whirl",n:"Whirlwind",k:"0",cd:18,base:4000000,g:3,d:lv=>`Spin for 3s: ${fmt(5*pm(lv))}x damage 4 times a second and blocks bullets`}
+];
+
+let S;
+function fresh(keepReb){return {coins:0,lv:{},beaten:0,reb:keepReb||0,sel:0,anvil:0,pw:{}};}
+function load(){try{const r=JSON.parse(localStorage.getItem("emberforge")||"null");if(r&&r.lv)return r;}catch(e){}return fresh();}
+function save(){S.t=Date.now();try{localStorage.setItem("emberforge",JSON.stringify(S));}catch(e){}}
+const hot=window.claude&&window.claude.hot;
+S=(hot&&hot.data&&hot.data.lv)?hot.data:load();
+if(!S.pw)S.pw={};
+if(hot&&hot.snapshot)hot.snapshot(()=>S);
+const bootT=S.t||0;
+
+// Cloud save: when the viewer is signed in, progress is kept in their own private slot
+// so it follows them to any browser. Falls back to this browser's storage otherwise.
+let cloudRef=null,cloudBusy=false,cloudPushedT=0;
+(async()=>{
+ if(!window.claude||!window.claude.use)return;
+ const [user,db]=await Promise.all([window.claude.use("user"),window.claude.use("db")]);
+ if(!user||!db)return;
+ const uid=await user.id();if(!uid)return;
+ const ref=db.doc("data/users/"+uid+"/save");
+ const snap=await ref.get();
+ const d=snap.exists?snap.data():null;
+ if(d&&typeof d.save==="string"&&(d.t||0)>bootT){
+  try{const c=JSON.parse(d.save);if(c&&c.lv){
+   const adopt=()=>{S=c;if(!S.pw)S.pw={};if(hot&&hot.snapshot)hot.snapshot(()=>S);
+    try{localStorage.setItem("emberforge",JSON.stringify(S));}catch(e){}
+    painted=-1;bossKey="";paintAnvil();render();toast("Loaded your saved progress");};
+   if(F){const w=setInterval(()=>{if(!F){clearInterval(w);adopt();}},500);}else adopt();
+   cloudPushedT=d.t;}}catch(e){}
+ }
+ cloudRef=ref;
+ $("saveNote").textContent="Progress saves to your Claude account, so it follows you to any browser where you are signed in.";
+})().catch(()=>{});
+function cloudPush(){
+ if(!cloudRef||cloudBusy||!S.t||S.t<=cloudPushedT||F)return;
+ cloudBusy=true;const t=S.t;
+ cloudRef.set({save:JSON.stringify(S),t}).then(()=>{cloudPushedT=t;},()=>{}).finally(()=>{cloudBusy=false;});
+}
+function toast(m){const d=document.createElement("div");d.className="overlay";d.style.background="transparent";d.style.pointerEvents="none";d.style.placeItems="end center";
+ d.innerHTML=`<div class="card" style="padding:10px 16px">${m}</div>`;document.body.appendChild(d);setTimeout(()=>d.remove(),2500);}
+
+const L=id=>S.lv[id]||0;
+const PL=id=>S.pw[id]||0;
+const rebMult=()=>1+0.5*S.reb;
+const trophyMult=()=>Math.pow(1.4,S.beaten);
+const tier=()=>TIERS[S.anvil||0];
+const perTap=()=>(1+L("glove"))*Math.pow(2,L("hammer"))*tier().mult*trophyMult()*rebMult();
+const perSec=()=>(L("bellows")+8*L("apprentice"))*trophyMult()*rebMult()+tier().auto*perTap();
+const dmg=()=>(1+2*L("str"))*Math.pow(2,L("blade"))*rebMult();
+const crit=()=>0.05*L("charm");
+const fightTime=()=>30+3*L("glass");
+const taken=()=>Math.pow(0.88,L("armor"));
+const maxHp=()=>100+20*L("vit");
+const cost=u=>Math.round(u.base*Math.pow(u.g,L(u.id)));
+const pcost=p=>Math.round(p.base*Math.pow(p.g,PL(p.id)));
+
+function fmt(n){n=Math.floor(n);if(n<1e4)return n.toLocaleString("en-US");
+ const u=["K","M","B","T","Qa","Qi","Sx"];let i=-1;while(n>=1000&&i<u.length-1){n/=1000;i++;}return n.toFixed(n<10?2:n<100?1:0)+u[i];}
+
+const $=id=>document.getElementById(id);
+function flo(parent,x,y,txt,cls){const f=document.createElement("div");f.className="float "+(cls||"");f.textContent=txt;
+ f.style.left=x+"px";f.style.top=y+"px";parent.appendChild(f);setTimeout(()=>f.remove(),900);}
+
+// Anvil
+$("anvil").addEventListener("click",e=>{
+ const g=perTap();S.coins+=g;
+ const r=$("forgeCard").getBoundingClientRect();
+ const x=(e.clientX||r.left+r.width/2)-r.left-20+Math.random()*30, y=(e.clientY||r.top+r.height/2)-r.top-30;
+ flo($("forgeCard"),x,y,"+"+fmt(g)); render();
+});
+
+// Anvil evolution
+function buyTier(idx){
+ const nx=TIERS[idx];if(idx!==(S.anvil||0)+1||!nx||S.coins<nx.cost)return;
+ S.coins-=nx.cost;S.anvil=(S.anvil||0)+1;save();paintAnvil();render();
+ overlay("Upgraded to "+nx.n+"!",`Every tap now earns x${fmt(nx.mult)} coins`+(nx.auto?` and the anvil strikes itself ${nx.auto} times per second.`:"."));
+}
+function buildEvo(){const el=$("evoList");TIERS.forEach((t,i)=>{const b=document.createElement("button");b.className="tier";b.id="tier-"+i;
+ b.innerHTML=`<span class="orb" style="background:radial-gradient(circle at 35% 30%,${t.c[0]},${t.c[1]} 55%,${t.c[2]})"></span><span class="tn">${t.n}</span><small>Tap x${fmt(t.mult)}${t.auto?" · auto "+t.auto+"/s":""}</small><span class="c"></span>`;
+ b.addEventListener("click",()=>buyTier(i));el.appendChild(b);});}
+let painted=-1;
+function paintAnvil(){const k=S.anvil||0;if(k===painted)return;painted=k;const T=TIERS[k],a=$("anvil");
+ a.style.setProperty("--a1",T.c[0]);a.style.setProperty("--a2",T.c[1]);a.style.setProperty("--a3",T.c[2]);
+ a.style.setProperty("--ash",T.ash);a.style.setProperty("--glow",T.glow);
+ $("tierName").textContent=T.n;$("tierName").style.color=T.c[1];}
+function renderEvolve(){const T=tier(),k=S.anvil||0;
+ $("tierPerk").textContent=`Tap x${fmt(T.mult)}`+(T.auto?` · auto-strikes ${T.auto}/sec`:"");
+ TIERS.forEach((t,i)=>{const b=$("tier-"+i);const st=i<=k?"owned":i===k+1?"next":"locked";
+  b.className="tier "+st;b.disabled=st!=="next"||S.coins<t.cost;
+  b.querySelector(".c").textContent=i===k?"Equipped":i<k?"Owned":fmt(t.cost);});}
+
+// Upgrade rack
+function buildShop(){
+ $("shop").innerHTML="";
+ UPS.forEach(u=>{const b=document.createElement("button");b.className="up";b.id="up-"+u.id;
+  b.innerHTML=`<span class="n">${u.n} <span class="lv"></span></span><span class="c"></span><span class="d">${u.d}</span>`;
+  b.addEventListener("click",()=>{const c=cost(u);if(S.coins<c||(u.max&&L(u.id)>=u.max))return;S.coins-=c;S.lv[u.id]=L(u.id)+1;render();save();});
+  $("shop").appendChild(b);});
+}
+function renderShop(){UPS.forEach(u=>{const b=$("up-"+u.id);const maxed=u.max&&L(u.id)>=u.max;const c=cost(u);
+ b.querySelector(".lv").textContent="Lv "+L(u.id)+(u.max?"/"+u.max:"");
+ b.querySelector(".c").textContent=maxed?"MAX":fmt(c);b.disabled=maxed||S.coins<c;});}
+
+// Power shop
+function buildPowerShop(){const el=$("powerShop");el.innerHTML="";
+ POWERS.forEach(p=>{const b=document.createElement("button");b.className="up power";b.id="ps-"+p.id;
+  b.innerHTML=`<span class="n">${p.n} <span class="lv"></span></span><span class="c"></span><span class="d"></span>`;
+  b.addEventListener("click",()=>{const c=pcost(p);if(S.coins<c||(p.max&&PL(p.id)>=p.max))return;S.coins-=c;S.pw[p.id]=PL(p.id)+1;save();render();
+   if(PL(p.id)===1)overlay(p.n+" unlocked!",`Press its button in the boss room (or key ${p.k}). Cooldown: ${p.cd}s.`);});
+  el.appendChild(b);});}
+function renderPowerShop(){POWERS.forEach(p=>{const b=$("ps-"+p.id),lv=PL(p.id),maxed=p.max&&lv>=p.max,c=pcost(p);
+ b.querySelector(".lv").textContent=lv?"Lv "+lv+(p.max?"/"+p.max:""):"Locked";
+ b.querySelector(".d").textContent=p.d(lv?lv:1)+` · ${p.cd}s cooldown`;
+ b.querySelector(".c").textContent=maxed?"MAX":(lv?"":"Unlock ")+fmt(c);b.disabled=maxed||S.coins<c;});}
+
+// ---------- Boss room: a top-down arena you walk around in ----------
+const RW=900,RH=540,WALL=40;
+let F=null; // the live fight
+let shake=0, clock=0;
+let cd={}, freezeT=0, rageT=0, fx=[], boltQ=[], shieldT=0, cloneT=0, cloneTick=0, slowT=0, whirlT=0, whirlTick=0;
+const keys={};
+let joy=null; // {id,ox,oy,x,y}
+
+function selBoss(i){if(F)return;S.sel=i;render();}
+let bossKey="";
+function renderBossList(){const k=S.beaten+"|"+S.sel+"|"+!!F;if(k===bossKey)return;bossKey=k;const el=$("bossList");el.innerHTML="";
+ BOSSES.forEach((b,i)=>{const c=document.createElement("button");c.className="chip"+(i<S.beaten?" done":"")+(i===S.sel?" sel":"");
+  c.textContent=(i<S.beaten?"✓ ":"")+b.n;c.disabled=i>S.beaten||!!F;c.addEventListener("click",()=>selBoss(i));el.appendChild(c);});}
+
+const bossSize=i=>34+Math.min(i,14)*2.6+(i===9||i===19?6:0);
+function enterRoom(){
+ if(F)return;const i=S.sel;
+ F={i,hp:bossHp(i),max:bossHp(i),tLeft:fightTime(),total:fightTime(),
+  px:RW/2,py:RH-110,face:-Math.PI/2,php:maxHp(),pmax:maxHp(),inv:0,atkCD:0,swingT:0,dashT:0,dashCD:0,dx:0,dy:-1,
+  bx:RW/2,by:170,br:bossSize(i),bstate:"walk",bt:1.6,cdir:0,flash:0,hazards:[],bullets:[],pillars:PILLARS[ROOMS[i].pil]};
+ cd={};freezeT=0;rageT=0;fx=[];boltQ=[];joy=null;shieldT=0;cloneT=0;slowT=0;whirlT=0;for(const k in keys)keys[k]=false;
+ $("roomName").textContent=ROOMS[i].n;$("roomBoss").textContent=BOSSES[i].n;$("roomBoss").style.color=ROOMS[i].light;
+ buildPowerBar();
+ $("room").hidden=false;document.body.style.overflow="hidden";$("msg").textContent="";
+ try{const el=document.documentElement,rq=el.requestFullscreen||el.webkitRequestFullscreen;if(rq&&!document.fullscreenElement){const pr=rq.call(el);if(pr&&pr.catch)pr.catch(()=>{});}}catch(_){}
+ render();
+}
+function closeRoom(){F=null;boltQ=[];fx=[];joy=null;$("room").hidden=true;document.body.style.overflow="";
+ try{if(document.fullscreenElement&&document.exitFullscreen){const pr=document.exitFullscreen();if(pr&&pr.catch)pr.catch(()=>{});}}catch(_){}}
+$("fight").addEventListener("click",enterRoom);
+$("cv").addEventListener("click",enterRoom);
+$("flee").addEventListener("click",()=>{if(!F)return;const n=BOSSES[F.i].n;closeRoom();$("msg").textContent="You ran away from "+n+".";$("msg").style.color="";render();});
+
+const cv=$("cv"),cx=cv.getContext("2d");
+const rcv=$("rcv"),rx=rcv.getContext("2d");
+
+// The canvas is letterboxed (object-fit: contain), so find where the picture actually sits on screen.
+function box(){const r=rcv.getBoundingClientRect(),s=Math.min(r.width/RW,r.height/RH);
+ return {left:r.left+(r.width-RW*s)/2,top:r.top+(r.height-RH*s)/2,s};}
+function toRoomXY(x,y){const b=box(),p=$("roomIn").getBoundingClientRect();
+ return [b.left-p.left+x*b.s, b.top-p.top+y*b.s];}
+function hitBoss(d,label,cls,x,y){
+ if(!F)return;F.hp-=d;shake=Math.min(14,shake+5);F.flash=1;
+ const [sx,sy]=toRoomXY(x==null?F.bx:x,y==null?F.by-F.br:y);
+ flo($("roomIn"),sx-20+Math.random()*30,sy-20,(label?label+" ":"")+"-"+fmt(d),cls);
+ if(F.hp<=0)win();}
+function hurt(frac,label){
+ if(!F||F.inv>0||F.dashT>0||shieldT>0)return;
+ const d=Math.max(1,Math.round(frac*100*taken()));F.php-=d;F.inv=0.9;shake=Math.min(20,shake+12);
+ const [sx,sy]=toRoomXY(F.px,F.py-30);flo($("roomIn"),sx-20,sy-10,"-"+d+" HP","hurt");
+ if(F.php<=0){F.php=0;lose("knocked");}}
+
+// --- Player actions
+function attack(){
+ if(!F||F.atkCD>0)return;
+ F.atkCD=rageT>0?0.13:0.2;F.swingT=0.16;
+ F.face=Math.atan2(F.by-F.py,F.bx-F.px);
+ const dist=Math.hypot(F.bx-F.px,F.by-F.py);
+ const hx=F.px+Math.cos(F.face)*34,hy=F.py+Math.sin(F.face)*34;
+ if(dist<F.br+62){
+  let d=dmg(),isC=Math.random()<crit();if(isC)d*=3;if(rageT>0)d*=2+PL("rage");
+  fx.push({t:"spark",x:hx,y:hy,age:0,life:.25});
+  hitBoss(d,isC?"CRIT":"",isC?"crit":"dmg",hx,hy-10);
+ } else fx.push({t:"whiff",x:hx,y:hy,age:0,life:.2});
+}
+function dash(){
+ if(!F||F.dashCD>0)return;
+ let [mx,my]=moveVec();if(!mx&&!my){mx=Math.cos(F.face);my=Math.sin(F.face);}
+ const m=Math.hypot(mx,my);F.dx=mx/m;F.dy=my/m;F.dashT=0.18;F.dashCD=0.9;
+}
+function moveVec(){let mx=0,my=0;
+ if(keys.ArrowLeft||keys.KeyA)mx--;if(keys.ArrowRight||keys.KeyD)mx++;
+ if(keys.ArrowUp||keys.KeyW)my--;if(keys.ArrowDown||keys.KeyS)my++;
+ if(joy){const jx=joy.x-joy.ox,jy=joy.y-joy.oy,m=Math.hypot(jx,jy);if(m>8){mx=jx/Math.max(m,50);my=jy/Math.max(m,50);}}
+ const m=Math.hypot(mx,my);if(m>1){mx/=m;my/=m;}return [mx,my];}
+
+document.addEventListener("keydown",e=>{if(!F)return;
+ const P=POWERS.find(p=>p.k===e.key);if(P){usePower(P.id);return;}
+ if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(e.code))e.preventDefault();
+ if(e.code==="Space"||e.code==="KeyJ"){if(!e.repeat)attack();return;}
+ if(e.code==="ShiftLeft"||e.code==="ShiftRight"||e.code==="KeyK"){dash();return;}
+ keys[e.code]=true;});
+document.addEventListener("keyup",e=>{keys[e.code]=false;});
+window.addEventListener("blur",()=>{for(const k in keys)keys[k]=false;joy=null;});
+
+function canvasXY(e){const b=box();return [(e.clientX-b.left)/b.s,(e.clientY-b.top)/b.s];}
+rcv.addEventListener("pointerdown",e=>{
+ if(!F)return;e.preventDefault();const [x,y]=canvasXY(e);
+ if(e.pointerType!=="mouse"&&x<RW*0.5&&!joy){joy={id:e.pointerId,ox:x,oy:y,x,y};try{rcv.setPointerCapture(e.pointerId);}catch(_){}}
+ else attack();
+});
+rcv.addEventListener("pointermove",e=>{if(joy&&e.pointerId===joy.id){const [x,y]=canvasXY(e);joy.x=x;joy.y=y;}});
+const endJoy=e=>{if(joy&&e.pointerId===joy.id)joy=null;};
+rcv.addEventListener("pointerup",endJoy);rcv.addEventListener("pointercancel",endJoy);
+$("btnAtk").addEventListener("pointerdown",e=>{e.preventDefault();attack();});
+$("btnDash").addEventListener("pointerdown",e=>{e.preventDefault();dash();});
+
+// --- Powers
+function usePower(id){
+ const P=POWERS.find(p=>p.id===id);if(!F||!P||PL(id)<1||(cd[id]||0)>0)return;
+ const lv=PL(id);cd[id]=P.cd;
+ if(id==="fist")fx.push({t:"fireball",x:F.px,y:F.py,age:0,life:.35,sx:F.px,sy:F.py,end:()=>{fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:.5,r:150,c:"#ff8a3d"});hitBoss(dmg()*40*pm(lv),"FIRE FIST","power");}});
+ if(id==="bolt"){for(let k=0;k<8;k++)boltQ.push(clock+k*0.18);}
+ if(id==="freeze"){freezeT=3+2*lv;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.6,r:600,c:"#9fe6ff"});}
+ if(id==="rage"){rageT=6;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.5,r:200,c:"#ff3b4f"});}
+ if(id==="meteor")fx.push({t:"meteor",age:0,life:.75,end:()=>{fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:.8,r:300,c:"#ffb347"});hitBoss(dmg()*250*pm(lv),"METEOR","power");}});
+ if(id==="heal"){const h=Math.round(F.pmax*(0.3+0.1*(lv-1)));F.php=Math.min(F.pmax,F.php+h);
+  fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.6,r:120,c:"#7bd88f"});const [sx,sy]=toRoomXY(F.px,F.py-30);flo($("roomIn"),sx-20,sy-10,"+"+h+" HP","");}
+ if(id==="shield")shieldT=3+0.5*(lv-1);
+ if(id==="clones"){cloneT=6;cloneTick=0;}
+ if(id==="ice"){slowT=5;fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:.6,r:200,c:"#9fe6ff"});hitBoss(dmg()*20*pm(lv),"ICE","power");}
+ if(id==="whirl"){whirlT=3;whirlTick=0;}
+ render();
+}
+function buildPowerBar(){const el=$("powerBar");el.innerHTML="";let any=false;
+ POWERS.forEach(p=>{if(PL(p.id)<1)return;any=true;const b=document.createElement("button");b.className="pw";b.id="pw-"+p.id;
+  b.innerHTML=`<span class="pn">${p.n}</span><small>Key ${p.k}</small><span class="cdv"></span><span class="cdt"></span>`;
+  b.addEventListener("pointerdown",e=>{e.preventDefault();usePower(p.id);});el.appendChild(b);});
+ $("roomHint").textContent="Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift"+(any?" · Powers: number keys 1–9 and 0":" · Unlock Super Powers on the main screen");}
+function renderPowerBar(){POWERS.forEach(p=>{const b=$("pw-"+p.id);if(!b)return;const c=cd[p.id]||0;
+ b.style.setProperty("--p",c/p.cd);b.disabled=c>0;b.querySelector(".cdt").textContent=c>0?Math.ceil(c):"";});}
+
+// --- Boss brain
+function bossAttack(){
+ const i=Math.min(F.i,11),opts=["slam"];if(i>=1)opts.push("charge");if(i>=3)opts.push("ring");if(i>=6)opts.push("multi");
+ const a=opts[Math.floor(Math.random()*opts.length)];
+ if(a==="slam"||a==="multi"){const n=a==="multi"?3:1;
+  for(let k=0;k<n;k++){const ox=k?(Math.random()-.5)*220:0,oy=k?(Math.random()-.5)*160:0;
+   F.hazards.push({x:F.px+ox,y:F.py+oy,r:62+i*3,t:0,tmax:Math.max(0.65,1.05-i*0.04)});}
+  F.bstate="walk";}
+ else if(a==="charge"){F.bstate="wind";F.bt=Math.max(0.4,0.75-i*0.03);F.cdir=Math.atan2(F.py-F.by,F.px-F.bx);return;}
+ else if(a==="ring"){const n=8+Math.floor(i*1.5),off=Math.random()*Math.PI,sp=150+i*12;
+  for(let k=0;k<n;k++){const an=off+k*Math.PI*2/n;F.bullets.push({x:F.bx,y:F.by,vx:Math.cos(an)*sp,vy:Math.sin(an)*sp,r:9});}}
+ F.bt=Math.max(0.9,2.4-i*0.16);
+}
+function collide(o,r){ // keep inside walls and out of pillars
+ o.x=Math.max(WALL+r,Math.min(RW-WALL-r,o.x));o.y=Math.max(WALL+r,Math.min(RH-WALL-r,o.y));
+ for(const [qx,qy] of F.pillars){const dx=o.x-qx,dy=o.y-qy,d=Math.hypot(dx,dy),m=r+28;if(d<m&&d>0){o.x=qx+dx/d*m;o.y=qy+dy/d*m;}}}
+
+function update(dt){
+ if(!F)return;
+ for(const k in cd)cd[k]=Math.max(0,cd[k]-dt);
+ rageT=Math.max(0,rageT-dt);
+ const frozen=freezeT>0;
+ if(frozen)freezeT=Math.max(0,freezeT-dt);else F.tLeft-=dt;
+ // player
+ F.atkCD=Math.max(0,F.atkCD-dt);F.swingT=Math.max(0,F.swingT-dt);F.inv=Math.max(0,F.inv-dt);F.dashCD=Math.max(0,F.dashCD-dt);
+ const sp=240*(1+0.08*L("boots"))*(rageT>0?1.3:1);
+ let o={x:F.px,y:F.py};
+ if(F.dashT>0){F.dashT-=dt;o.x+=F.dx*780*dt;o.y+=F.dy*780*dt;}
+ else{const [mx,my]=moveVec();o.x+=mx*sp*dt;o.y+=my*sp*dt;if(mx||my)F.face=Math.atan2(my,mx);}
+ collide(o,16);F.px=o.x;F.py=o.y;
+ // boss
+ F.flash=Math.max(0,F.flash-dt*6);
+ if(!frozen){
+  F.bt-=dt;const ang=Math.atan2(F.py-F.by,F.px-F.bx);let b={x:F.bx,y:F.by};
+  if(F.bstate==="walk"){const bs=(55+Math.min(F.i,11)*9)*(slowT>0?0.45:1);b.x+=Math.cos(ang)*bs*dt;b.y+=Math.sin(ang)*bs*dt;if(F.bt<=0)bossAttack();}
+  else if(F.bstate==="wind"){if(F.bt<=0){F.bstate="charge";F.bt=0.55;}}
+  else if(F.bstate==="charge"){const cs=(520+Math.min(F.i,11)*25)*(slowT>0?0.5:1);b.x+=Math.cos(F.cdir)*cs*dt;b.y+=Math.sin(F.cdir)*cs*dt;
+   if(F.bt<=0){F.bstate="walk";F.bt=Math.max(0.9,2.2-Math.min(F.i,11)*0.15);}}
+  collide(b,F.br);F.bx=b.x;F.by=b.y;
+  if(Math.hypot(F.px-F.bx,F.py-F.by)<F.br+14)hurt(F.bstate==="charge"?0.28:0.12);
+  if(!F)return;
+  for(const h of F.hazards){h.t+=dt;if(h.t>=h.tmax&&!h.done){h.done=true;fx.push({t:"burst",x:h.x,y:h.y,age:0,life:.35,r:h.r,c:ROOMS[F.i].light});
+   if(Math.hypot(F.px-h.x,F.py-h.y)<h.r+10)hurt(0.24);if(!F)return;}}
+  F.hazards=F.hazards.filter(h=>!h.done);
+  for(const q of F.bullets){q.x+=q.vx*dt;q.y+=q.vy*dt;if(Math.hypot(F.px-q.x,F.py-q.y)<q.r+14){q.dead=true;hurt(0.1);if(!F)return;}}
+  F.bullets=F.bullets.filter(q=>!q.dead&&q.x>WALL&&q.x<RW-WALL&&q.y>WALL&&q.y<RH-WALL);
+ }
+ // lightning
+ while(F&&boltQ.length&&boltQ[0]<=clock){boltQ.shift();const pts=makeBolt();fx.push({t:"bolt",pts,age:0,life:.3});
+  const e=pts[pts.length-1];hitBoss(dmg()*8*pm(PL("bolt")),"ZAP","power",e[0],e[1]);}
+ if(!F)return;
+ shieldT=Math.max(0,shieldT-dt);slowT=Math.max(0,slowT-dt);
+ if(cloneT>0){cloneT-=dt;cloneTick-=dt;if(cloneTick<=0){cloneTick=0.4;const n=Math.min(6,1+PL("clones"));hitBoss(dmg()*n*2,"CLONES","dmg");}}
+ if(!F)return;
+ if(whirlT>0){whirlT-=dt;whirlTick-=dt;F.bullets=F.bullets.filter(q=>Math.hypot(q.x-F.px,q.y-F.py)>110);
+  if(whirlTick<=0){whirlTick=0.25;if(Math.hypot(F.bx-F.px,F.by-F.py)<F.br+110)hitBoss(dmg()*5*pm(PL("whirl")),"SPIN","power");}}
+ if(!F)return;
+ for(const f of fx){f.age+=dt;if(f.t==="fireball"){const p=Math.min(1,f.age/f.life);f.x=f.sx+(F.bx-f.sx)*p;f.y=f.sy+(F.by-f.sy)*p;}}
+ const done=fx.filter(f=>f.age>=f.life);fx=fx.filter(f=>f.age<f.life);
+ done.forEach(f=>{if(f.end&&F)f.end();});
+ if(F&&F.tLeft<=0){F.tLeft=0;lose("time");}
+}
+
+function win(){const i=F.i;closeRoom();const rw=Math.round(bossReward(i)*rebMult());S.coins+=rw;
+ const first=i===S.beaten;if(first){S.beaten++;if(S.sel<BOSSES.length-1)S.sel=S.beaten;}
+ save();
+ const last=first&&S.beaten===BOSSES.length;
+ overlay(last?BOSSES[i].n+" falls!":BOSSES[i].n+" defeated!",
+  `You earned <b style="color:var(--gold)">${fmt(rw)}</b> coins.`+(first?`<br>Trophy gained: all coin income x1.4.`:"")+
+  (last?`<br><br>You beat every boss. Rebirth to start over stronger (+50% coins and damage forever). Rebirth resets your anvil and powers.`:""));
+ render();
+}
+function lose(why){const i=F.i;closeRoom();
+ overlay(why==="time"?"Out of time":"Knocked out",
+  BOSSES[i].n+(why==="time"?" outlasted you.":" beat you this time.")+" Get more damage, Heart Forge, Armor Plate or powers, then try again.");
+ $("msg").textContent=BOSSES[i].n+" won. Upgrade and try again.";$("msg").style.color="var(--bad)";render();}
+$("rebirth").addEventListener("click",()=>{
+ overlay("Rebirth?","You lose coins, upgrades, powers and trophies, but gain a permanent +50% to coins and damage.",[
+  ["Rebirth",()=>{S=fresh(S.reb+1);if(hot&&hot.snapshot)hot.snapshot(()=>S);save();paintAnvil();render();}],["Not yet",null]]);
+});
+$("reset").addEventListener("click",()=>{
+ overlay("Wipe your save?","Everything goes back to zero, rebirths included.",[["Wipe it",()=>{S=fresh();closeRoom();save();paintAnvil();render();}],["Cancel",null]]);
+});
+function overlay(title,html,btns){const o=document.createElement("div");o.className="overlay";
+ o.innerHTML=`<div class="card"><h3>${title}</h3><p>${html}</p><div class="row" style="justify-content:center"></div></div>`;
+ (btns||[["Continue",null]]).forEach(([t,fn],k)=>{const b=document.createElement("button");b.textContent=t;if(k===0)b.className="go";
+  b.addEventListener("click",()=>{o.remove();if(fn)fn();});o.querySelector(".row").appendChild(b);});
+ document.body.appendChild(o);o.querySelector("button").focus();}
+
+// ---------- Drawing (top-down) ----------
+function drawArena(ctx,R,pillars,t){
+ // floor tiles
+ ctx.fillStyle=R.f[0];ctx.fillRect(0,0,RW,RH);
+ const ts=60;
+ for(let y=0;y<RH;y+=ts)for(let x=0;x<RW;x+=ts){if(((x+y)/ts)%2){ctx.fillStyle=R.f[1];ctx.fillRect(x,y,ts,ts);}}
+ ctx.strokeStyle="#00000022";ctx.lineWidth=1;
+ for(let x=0;x<=RW;x+=ts){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,RH);ctx.stroke();}
+ for(let y=0;y<=RH;y+=ts){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(RW,y);ctx.stroke();}
+ // center rune circle
+ ctx.strokeStyle=R.light+"33";ctx.lineWidth=3;ctx.beginPath();ctx.arc(RW/2,RH/2,150,0,Math.PI*2);ctx.stroke();
+ ctx.beginPath();ctx.arc(RW/2,RH/2,120,0,Math.PI*2);ctx.stroke();
+ // walls
+ ctx.fillStyle=R.w;ctx.fillRect(0,0,RW,WALL);ctx.fillRect(0,RH-WALL,RW,WALL);ctx.fillRect(0,0,WALL,RH);ctx.fillRect(RW-WALL,0,WALL,RH);
+ ctx.strokeStyle="#00000044";
+ for(let x=0;x<RW;x+=50){ctx.strokeRect(x,0,50,WALL/2);ctx.strokeRect(x+25,WALL/2,50,WALL/2);ctx.strokeRect(x,RH-WALL,50,WALL/2);ctx.strokeRect(x+25,RH-WALL/2,50,WALL/2);}
+ ctx.fillStyle="#00000055";ctx.fillRect(WALL,WALL,RW-2*WALL,8);ctx.fillRect(WALL,WALL,8,RH-2*WALL);
+ // torches on walls
+ const torches=[[150,WALL/2],[RW/2,WALL/2],[RW-150,WALL/2],[150,RH-WALL/2],[RW/2,RH-WALL/2],[RW-150,RH-WALL/2],[WALL/2,RH/2],[RW-WALL/2,RH/2]];
+ for(const [x,y] of torches){const fl=1+Math.sin(t*13+x+y)*0.12+Math.sin(t*7.3+x)*0.08;
+  const g=ctx.createRadialGradient(x,y,2,x,y,110*fl);g.addColorStop(0,R.light+"55");g.addColorStop(1,R.light+"00");ctx.fillStyle=g;ctx.fillRect(x-120,y-120,240,240);
+  ctx.fillStyle=R.light;ctx.beginPath();ctx.arc(x,y,7*fl,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffffffcc";ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();}
+ // pillars
+ for(const [x,y] of pillars){ctx.fillStyle="#00000066";ctx.beginPath();ctx.ellipse(x+6,y+8,30,26,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=R.w;ctx.beginPath();ctx.arc(x,y,28,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#ffffff18";ctx.beginPath();ctx.arc(x-6,y-6,18,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle="#00000055";ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,28,0,Math.PI*2);ctx.stroke();}
+}
+function drawParticles(ctx,R,t){
+ ctx.fillStyle=R.pc;
+ for(let k=0;k<40;k++){
+  let x=((k*0.6180339)%1)*RW,y,a=0.7,r=1.5+(k%3);const sp=0.5+(k%4)*0.25;
+  if(R.p==="ember"){y=RH-((t*40*sp+k*53)%RH);x+=Math.sin(t*2+k)*12;a=0.8;}
+  else if(R.p==="snow"){y=(t*28*sp+k*41)%RH;x+=Math.sin(t+k)*15;a=0.85;}
+  else if(R.p==="ash"){y=(t*12*sp+k*41)%RH;x+=Math.sin(t*0.7+k)*20;a=0.5;}
+  else if(R.p==="bubble"){y=((k*0.7548776+0.31)%1)*RH;r=(2+(k%3))*(1+0.6*Math.abs(Math.sin(t*1.2+k)));a=0.35;}
+  else if(R.p==="star"){y=((k*0.7548776+0.31)%1)*RH;a=0.3+0.7*Math.abs(Math.sin(t*1.5+k));}
+  else {y=((k*0.7548776+0.31)%1)*RH;a=Math.max(0,Math.sin(t*6+k*1.7))**8;}
+  ctx.globalAlpha=a;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();}
+ ctx.globalAlpha=1;
+ const g=ctx.createRadialGradient(RW/2,RH/2,RH*0.35,RW/2,RH/2,RW*0.62);g.addColorStop(0,"#00000000");g.addColorStop(1,"#00000088");ctx.fillStyle=g;ctx.fillRect(0,0,RW,RH);
+}
+
+function drawBoss(ctx,X,Y,size,i,live,flash,t){
+ const B=BOSSES[i];const bob=Math.sin(t*3)*3;
+ ctx.fillStyle="#00000066";ctx.beginPath();ctx.ellipse(X,Y+size*0.85,size*1.05,size*0.3,0,0,Math.PI*2);ctx.fill();
+ ctx.save();ctx.translate(X,Y+bob);
+ ctx.fillStyle="#2b1a14";
+ if(i>=3){for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*size*0.5,-size*0.6);ctx.lineTo(q*size*0.95,-size*1.35);ctx.lineTo(q*size*0.2,-size*0.85);ctx.fill();}}
+ if(i===9||i===19){ctx.fillStyle="#ffd166";ctx.beginPath();ctx.moveTo(-size*.5,-size*.85);
+  for(let k=0;k<=4;k++){ctx.lineTo(-size*.5+k*size*.25,-size*(k%2?0.9:1.25));}ctx.lineTo(size*.5,-size*.85);ctx.fill();}
+ const fl=flash>0.5;
+ ctx.fillStyle=fl?"#ffffff":B.c;ctx.beginPath();ctx.ellipse(0,0,size,size*0.9,0,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#00000033";ctx.beginPath();ctx.ellipse(0,size*0.35,size*0.8,size*0.45,0,0,Math.PI);ctx.fill();
+ ctx.strokeStyle=fl?"#ffffff":B.c;ctx.lineWidth=size*0.22;ctx.lineCap="round";
+ for(const q of[-1,1]){ctx.beginPath();ctx.moveTo(q*size*0.85,0);ctx.lineTo(q*size*1.4,size*0.3+Math.sin(t*3+q)*size*0.15);ctx.stroke();}
+ const eyes=[1,2,3,3][B.e]||2;const ey=-size*0.2,gap=size*0.35;
+ for(let k=0;k<eyes;k++){const ex=(k-(eyes-1)/2)*gap;ctx.fillStyle="#1a0d0a";ctx.beginPath();ctx.ellipse(ex,ey,size*0.13,size*0.16,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle=live?"#ff5d6c":"#ffd166";ctx.beginPath();ctx.arc(ex+size*0.03,ey-size*0.03,size*0.05,0,Math.PI*2);ctx.fill();}
+ ctx.strokeStyle="#1a0d0a";ctx.lineWidth=size*0.08;ctx.beginPath();
+ if(live){ctx.moveTo(-size*.35,size*.3);for(let k=1;k<=6;k++)ctx.lineTo(-size*.35+k*size*.7/6,size*(k%2?.38:.3));}
+ else ctx.arc(0,size*0.25,size*0.25,0.15*Math.PI,0.85*Math.PI);
+ ctx.stroke();ctx.restore();
+}
+
+function drawHero(ctx,x,y,face,swing,blink,rage,col){
+ if(blink)ctx.globalAlpha=0.4;
+ ctx.fillStyle="#00000066";ctx.beginPath();ctx.ellipse(x,y+14,16,6,0,0,Math.PI*2);ctx.fill();
+ // hammer
+ const sw=swing>0?(1-swing/0.16)*2.2-1.1:0.9;const a=face+sw;
+ ctx.save();ctx.translate(x,y);ctx.rotate(a);
+ ctx.fillStyle="#6b4a2a";ctx.fillRect(6,-3,28,6);
+ ctx.fillStyle=TIERS[S.anvil||0].c[1];ctx.fillRect(28,-10,14,20);ctx.strokeStyle="#00000088";ctx.lineWidth=2;ctx.strokeRect(28,-10,14,20);
+ ctx.restore();
+ // body
+ ctx.fillStyle=col||(rage?"#ff5d6c":"#ff8a3d");ctx.beginPath();ctx.arc(x,y,16,0,Math.PI*2);ctx.fill();
+ ctx.strokeStyle="#2a120a";ctx.lineWidth=3;ctx.stroke();
+ ctx.fillStyle="#f5d3b3";ctx.beginPath();ctx.arc(x+Math.cos(face)*5,y+Math.sin(face)*5-2,9,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle="#2a120a";
+ for(const s of[-1,1]){const ex=x+Math.cos(face)*9+Math.cos(face+Math.PI/2)*s*4,ey=y+Math.sin(face)*9+Math.sin(face+Math.PI/2)*s*4-2;ctx.beginPath();ctx.arc(ex,ey,2,0,Math.PI*2);ctx.fill();}
+ ctx.globalAlpha=1;
+}
+
+function drawFx(ctx){
+ for(const f of fx){const p=f.age/f.life;
+  if(f.t==="spark"){ctx.strokeStyle="#fff3c4";ctx.globalAlpha=1-p;ctx.lineWidth=3;
+   for(let k=0;k<6;k++){const a=k*Math.PI/3,r1=6+p*10,r2=14+p*22;ctx.beginPath();ctx.moveTo(f.x+Math.cos(a)*r1,f.y+Math.sin(a)*r1);ctx.lineTo(f.x+Math.cos(a)*r2,f.y+Math.sin(a)*r2);ctx.stroke();}}
+  else if(f.t==="whiff"){ctx.strokeStyle="#ffffff";ctx.globalAlpha=(1-p)*0.5;ctx.lineWidth=2;ctx.beginPath();ctx.arc(f.x,f.y,8+p*14,0,Math.PI*2);ctx.stroke();}
+  else if(f.t==="burst"){ctx.globalAlpha=(1-p)*0.85;const r=10+p*f.r;
+   const g=ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,r);g.addColorStop(0,"#ffffff");g.addColorStop(0.35,f.c);g.addColorStop(1,f.c+"00");
+   ctx.fillStyle=g;ctx.beginPath();ctx.arc(f.x,f.y,r,0,Math.PI*2);ctx.fill();}
+  else if(f.t==="fireball"){ctx.globalAlpha=1;for(let k=0;k<4;k++){ctx.fillStyle=k%2?"#ffd166":"#ff5a1f";ctx.beginPath();ctx.arc(f.x,f.y,20-k*4,0,Math.PI*2);ctx.fill();}}
+  else if(f.t==="bolt"){ctx.globalAlpha=1-p;
+   for(const [w,c] of [[14,"#7fd3f566"],[4,"#ffffff"]]){ctx.strokeStyle=c;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(f.pts[0][0],f.pts[0][1]);
+    for(const q of f.pts)ctx.lineTo(q[0],q[1]);ctx.stroke();}
+   if(p<0.25){ctx.fillStyle="#ffffff18";ctx.fillRect(0,0,RW,RH);}}
+  else if(f.t==="meteor"&&F){const sx=RW*1.05,sy=-60,ex=F.bx,ey=F.by;const x=sx+(ex-sx)*p,y=sy+(ey-sy)*p*p;
+   ctx.globalAlpha=1;
+   for(let k=6;k>0;k--){ctx.fillStyle=k%2?"#ff8a3d55":"#ffd16644";ctx.beginPath();ctx.arc(x+k*16,y-k*14,36-k*3,0,Math.PI*2);ctx.fill();}
+   ctx.fillStyle="#5a3a2a";ctx.beginPath();ctx.arc(x,y,34,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle="#ff8a3d";ctx.beginPath();ctx.arc(x-8,y+6,10,0,Math.PI*2);ctx.fill();
+   ctx.strokeStyle="#ff3b4f";ctx.lineWidth=3;ctx.globalAlpha=0.6;ctx.beginPath();ctx.arc(ex,ey,60*(1-p)+20,0,Math.PI*2);ctx.stroke();}
+ }
+ ctx.globalAlpha=1;
+}
+function makeBolt(){const x0=F.bx+(Math.random()-.5)*300,pts=[[x0,0]];let x=x0;
+ for(let y=40;y<F.by;y+=40){x+=(F.bx-x)*0.25+(Math.random()-.5)*60;pts.push([x,y]);}pts.push([F.bx+(Math.random()-.5)*40,F.by+(Math.random()-.5)*30]);return pts;}
+
+function drawPreview(t){const i=S.sel,R=ROOMS[i];
+ cx.setTransform(cv.width/RW,0,0,cv.height/RH,0,0);
+ drawArena(cx,R,PILLARS[R.pil],t);drawBoss(cx,RW/2,190,bossSize(i)*1.3,i,false,0,t);
+ drawHero(cx,RW/2,RH-110,-Math.PI/2,0,false,false);drawParticles(cx,R,t);
+ cx.fillStyle="#000000a0";cx.fillRect(0,RH-64,RW,64);
+ cx.fillStyle="#f5e9df";cx.font="600 26px 'Chakra Petch', sans-serif";cx.textAlign="center";
+ cx.fillText(R.n+" — tap to enter",RW/2,RH-22);
+ cx.setTransform(1,0,0,1,0,0);}
+
+function drawLive(t){if(!F)return;const R=ROOMS[F.i],ctx=rx;
+ ctx.save();ctx.translate((Math.random()-.5)*shake,(Math.random()-.5)*shake);
+ drawArena(ctx,R,F.pillars,t);
+ // telegraphs
+ for(const h of F.hazards){const p=h.t/h.tmax;ctx.fillStyle="#ff3b4f"+Math.floor(30+p*90).toString(16).padStart(2,"0");
+  ctx.beginPath();ctx.arc(h.x,h.y,h.r*p,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#ff3b4f";ctx.lineWidth=3;ctx.beginPath();ctx.arc(h.x,h.y,h.r,0,Math.PI*2);ctx.stroke();}
+ if(F.bstate==="wind"){ctx.strokeStyle="#ff3b4f99";ctx.lineWidth=F.br*1.6;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(F.bx,F.by);
+  ctx.lineTo(F.bx+Math.cos(F.cdir)*420,F.by+Math.sin(F.cdir)*420);ctx.stroke();}
+ // order by y so the one in front draws last
+ const heroFirst=F.py<F.by;
+ const hero=()=>drawHero(ctx,F.px,F.py,F.face,F.swingT,F.inv>0&&Math.floor(clock*16)%2===0,rageT>0);
+ if(heroFirst)hero();
+ drawBoss(ctx,F.bx,F.by,F.br,F.i,true,F.flash,t);
+ if(!heroFirst)hero();
+ if(slowT>0){ctx.strokeStyle="#9fe6ffcc";ctx.lineWidth=4;ctx.setLineDash([10,8]);ctx.beginPath();ctx.arc(F.bx,F.by,F.br+14,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+ if(cloneT>0){const n=Math.min(6,1+PL("clones"));for(let k=0;k<n;k++){const a=clock*2+k*Math.PI*2/n,x=F.bx+Math.cos(a)*(F.br+44),y=F.by+Math.sin(a)*(F.br+44);
+  ctx.globalAlpha=0.7;drawHero(ctx,x,y,a+Math.PI,(clock*6+k)%1<0.3?0.08:0,false,false,"#6a4c9c");}}
+ if(whirlT>0){ctx.strokeStyle="#ffd166";ctx.lineWidth=5;for(let k=0;k<3;k++){const a=clock*14+k*Math.PI*2/3;ctx.globalAlpha=0.8;ctx.beginPath();ctx.arc(F.px,F.py,70+k*12,a,a+1.2);ctx.stroke();}ctx.globalAlpha=1;}
+ if(shieldT>0){ctx.fillStyle="#7fd3f533";ctx.strokeStyle="#bff0ff";ctx.lineWidth=3;ctx.beginPath();ctx.arc(F.px,F.py,30+Math.sin(clock*8)*2,0,Math.PI*2);ctx.fill();ctx.stroke();}
+ for(const q of F.bullets){ctx.fillStyle=R.light;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffffff";ctx.beginPath();ctx.arc(q.x,q.y,q.r*0.45,0,Math.PI*2);ctx.fill();}
+ drawFx(ctx);drawParticles(ctx,R,t);
+ ctx.restore();
+ if(freezeT>0){ctx.fillStyle="#7fd3f530";ctx.fillRect(0,0,RW,RH);
+  ctx.fillStyle="#e6f8ff";ctx.font="28px Bungee, Impact, sans-serif";ctx.textAlign="center";ctx.fillText("TIME FROZEN",RW/2,84);}
+ if(rageT>0){const g=ctx.createRadialGradient(RW/2,RH/2,RH*0.3,RW/2,RH/2,RW*0.6);g.addColorStop(0,"#ff3b4f00");g.addColorStop(1,"#ff3b4f88");ctx.fillStyle=g;ctx.fillRect(0,0,RW,RH);
+  ctx.fillStyle="#ffd0d4";ctx.font="24px Bungee, Impact, sans-serif";ctx.textAlign="center";ctx.fillText("RAGE x"+(2+PL("rage")),RW/2,freezeT>0?118:84);}
+ // range ring hint when close enough to hit
+ if(Math.hypot(F.bx-F.px,F.by-F.py)<F.br+62){ctx.strokeStyle="#ffd16699";ctx.lineWidth=2;ctx.setLineDash([6,6]);ctx.beginPath();ctx.arc(F.px,F.py,24,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+ // joystick
+ if(joy){ctx.strokeStyle="#ffffff55";ctx.lineWidth=3;ctx.beginPath();ctx.arc(joy.ox,joy.oy,50,0,Math.PI*2);ctx.stroke();
+  const jx=joy.x-joy.ox,jy=joy.y-joy.oy,m=Math.hypot(jx,jy),k=m>50?50/m:1;ctx.fillStyle="#ffffff66";ctx.beginPath();ctx.arc(joy.ox+jx*k,joy.oy+jy*k,22,0,Math.PI*2);ctx.fill();}
+}
+
+function render(){
+ $("sCoins").textContent=fmt(S.coins);$("sTap").textContent=fmt(perTap());$("sSec").textContent=fmt(perSec());
+ $("sDmg").textContent=fmt(dmg());$("sReb").textContent=S.reb;
+ $("trophyLine").textContent=S.beaten?`Trophies: ${S.beaten} (coins x${trophyMult().toFixed(2)})`:"Each new boss you beat multiplies your coin income.";
+ const i=F?F.i:S.sel;$("bossName").textContent=BOSSES[i].n;
+ $("bossTier").textContent=`Boss ${i+1} of ${BOSSES.length} · reward ${fmt(bossReward(i)*rebMult())}`;
+ $("gateInfo").textContent=`${fmt(bossHp(i))} HP · you get ${fightTime()}s · ${ROOMS[i].n}`;
+ const hp=F?Math.max(0,F.hp):bossHp(i),mx=bossHp(i);
+ $("hpBar").style.width=(hp/mx*100)+"%";$("hpTxt").textContent="Boss "+fmt(hp)+" / "+fmt(mx);
+ const mm=F?F.pmax:maxHp(),me=F?F.php:mm;$("meBar").style.width=(me/mm*100)+"%";$("meTxt").textContent="You "+Math.ceil(me)+" / "+mm+" HP";
+ const tl=F?F.tLeft:fightTime(),tt=F?F.total:fightTime();
+ $("tBar").style.width=(tl/tt*100)+"%";$("tTxt").textContent=tl.toFixed(1)+"s"+(freezeT>0?" · frozen":"");
+ $("tBarWrap").classList.toggle("frozen",freezeT>0);
+ $("rebirth").style.display=S.beaten>=BOSSES.length?"inline-block":"none";
+ renderShop();renderBossList();renderEvolve();renderPowerShop();renderPowerBar();
+}
+
+let last=performance.now(),saveT=0,uiT=0,cloudT=0;
+window.addEventListener("pagehide",()=>{save();cloudPush();});
+document.addEventListener("visibilitychange",()=>{if(document.hidden){save();cloudPush();}});
+function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;clock+=dt;
+ S.coins+=perSec()*dt;
+ update(dt);
+ shake*=0.85;
+ const t=now/1000;
+ if(F)drawLive(t);else drawPreview(t);
+ uiT+=dt;if(uiT>0.1){uiT=0;render();}
+ saveT+=dt;if(saveT>5){saveT=0;save();}
+ cloudT+=dt;if(cloudT>12){cloudT=0;cloudPush();}
+ requestAnimationFrame(loop);}
+buildShop();buildEvo();buildPowerShop();paintAnvil();render();requestAnimationFrame(loop);
+})();
+</script>
+
+</body></html>
