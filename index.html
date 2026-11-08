@@ -76,6 +76,10 @@ button.go{background:var(--ember);color:#2a120a;border-color:var(--ember)}
 .up .c{grid-row:1/3;grid-column:2;align-self:center;color:var(--gold);font-variant-numeric:tabular-nums}
 .up .lv{font-weight:400;color:var(--muted);font-size:12px}
 .up.power .n{color:var(--gold)}
+.amt{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:10px}
+.amt span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-right:4px}
+.amt button{padding:6px 14px;font-size:13px;border-radius:999px}
+.amt button.on{background:var(--ember);color:#2a120a;border-color:var(--ember)}
 .bosses{display:flex;gap:6px;flex-wrap:wrap}
 .chip{font-size:12px;padding:6px 10px;border-radius:999px}
 .chip.done{background:#24402b;border-color:#3b6b47;color:var(--good)}
@@ -154,6 +158,7 @@ button.go{background:var(--ember);color:#2a120a;border-color:var(--ember)}
   <section class="card">
     <h2>Super Powers</h2>
     <div class="hint" style="margin-bottom:10px">Unlock powers here, then use them inside the boss room. Each level makes a power stronger.</div>
+    <div class="amt" data-amt></div>
     <div class="shop" id="powerShop"></div>
   </section>
 
@@ -165,6 +170,7 @@ button.go{background:var(--ember);color:#2a120a;border-color:var(--ember)}
 
   <section class="card">
     <h2>Upgrade Rack</h2>
+    <div class="amt" data-amt></div>
     <div class="shop" id="shop"></div>
   </section>
   <div class="hint" style="text-align:center"><span id="saveNote">Progress saves in this browser.</span> <button id="reset" style="padding:4px 10px;font-size:12px">Wipe save</button></div>
@@ -357,29 +363,44 @@ function renderEvolve(){const T=tier(),k=S.anvil||0;
   b.className="tier "+st;b.disabled=st!=="next"||S.coins<t.cost;
   b.querySelector(".c").textContent=i===k?"Equipped":i<k?"Owned":fmt(t.cost);});}
 
+// Buy amount: 1, 10, 100 or Max (as many as you can afford). Shared by both shops.
+const AMTS=[1,10,100,"max"];
+let buyAmt=1;try{const v=localStorage.getItem("emberforge-amt");if(v)buyAmt=v==="max"?"max":+v||1;}catch(e){}
+function buildAmt(){document.querySelectorAll("[data-amt]").forEach(el=>{el.innerHTML="<span>Buy</span>";
+ AMTS.forEach(a=>{const b=document.createElement("button");b.textContent=a==="max"?"Max":"x"+a;b.dataset.a=a;
+  b.addEventListener("click",()=>{buyAmt=a;try{localStorage.setItem("emberforge-amt",String(a));}catch(e){}paintAmt();render();});el.appendChild(b);});});paintAmt();}
+function paintAmt(){document.querySelectorAll("[data-amt] button").forEach(b=>b.classList.toggle("on",b.dataset.a===String(buyAmt)));}
+// Work out how many levels to buy and what they cost in total.
+function plan(costAt,lv,max){let n=0,total=0;const lim=buyAmt==="max"?100000:buyAmt;
+ while(n<lim&&!(max&&lv+n>=max)){const c=costAt(lv+n);if(buyAmt==="max"&&total+c>S.coins)break;total+=c;n++;}
+ return {n,total,first:costAt(lv)};}
+const upCost=u=>lv=>Math.round(u.base*Math.pow(u.g,lv));
+const pwCost=p=>lv=>Math.round(p.base*Math.pow(p.g,lv));
+function priceText(pl){return pl.n===0?fmt(pl.first):(pl.n>1?"x"+pl.n+" · ":"")+fmt(pl.total);}
+
 // Upgrade rack
 function buildShop(){
  $("shop").innerHTML="";
  UPS.forEach(u=>{const b=document.createElement("button");b.className="up";b.id="up-"+u.id;
   b.innerHTML=`<span class="n">${u.n} <span class="lv"></span></span><span class="c"></span><span class="d">${u.d}</span>`;
-  b.addEventListener("click",()=>{const c=cost(u);if(S.coins<c||(u.max&&L(u.id)>=u.max))return;S.coins-=c;S.lv[u.id]=L(u.id)+1;render();save();});
+  b.addEventListener("click",()=>{const pl=plan(upCost(u),L(u.id),u.max);if(!pl.n||S.coins<pl.total)return;S.coins-=pl.total;S.lv[u.id]=L(u.id)+pl.n;render();save();});
   $("shop").appendChild(b);});
 }
-function renderShop(){UPS.forEach(u=>{const b=$("up-"+u.id);const maxed=u.max&&L(u.id)>=u.max;const c=cost(u);
+function renderShop(){UPS.forEach(u=>{const b=$("up-"+u.id);const maxed=u.max&&L(u.id)>=u.max;const pl=plan(upCost(u),L(u.id),u.max);
  b.querySelector(".lv").textContent="Lv "+L(u.id)+(u.max?"/"+u.max:"");
- b.querySelector(".c").textContent=maxed?"MAX":fmt(c);b.disabled=maxed||S.coins<c;});}
+ b.querySelector(".c").textContent=maxed?"MAX":priceText(pl);b.disabled=maxed||!pl.n||S.coins<pl.total;});}
 
 // Power shop
 function buildPowerShop(){const el=$("powerShop");el.innerHTML="";
  POWERS.forEach(p=>{const b=document.createElement("button");b.className="up power";b.id="ps-"+p.id;
   b.innerHTML=`<span class="n">${p.n} <span class="lv"></span></span><span class="c"></span><span class="d"></span>`;
-  b.addEventListener("click",()=>{const c=pcost(p);if(S.coins<c||(p.max&&PL(p.id)>=p.max))return;S.coins-=c;S.pw[p.id]=PL(p.id)+1;save();render();
-   if(PL(p.id)===1)overlay(p.n+" unlocked!",`Press its button in the boss room (or key ${p.k}). Cooldown: ${p.cd}s.`);});
+  b.addEventListener("click",()=>{const was=PL(p.id),pl=plan(pwCost(p),was,p.max);if(!pl.n||S.coins<pl.total)return;S.coins-=pl.total;S.pw[p.id]=was+pl.n;save();render();
+   if(was===0)overlay(p.n+" unlocked!",`Press its button in the boss room (or key ${p.k}). Cooldown: ${p.cd}s.`);});
   el.appendChild(b);});}
-function renderPowerShop(){POWERS.forEach(p=>{const b=$("ps-"+p.id),lv=PL(p.id),maxed=p.max&&lv>=p.max,c=pcost(p);
+function renderPowerShop(){POWERS.forEach(p=>{const b=$("ps-"+p.id),lv=PL(p.id),maxed=p.max&&lv>=p.max,pl=plan(pwCost(p),lv,p.max);
  b.querySelector(".lv").textContent=lv?"Lv "+lv+(p.max?"/"+p.max:""):"Locked";
  b.querySelector(".d").textContent=p.d(lv?lv:1)+` · ${p.cd}s cooldown`;
- b.querySelector(".c").textContent=maxed?"MAX":(lv?"":"Unlock ")+fmt(c);b.disabled=maxed||S.coins<c;});}
+ b.querySelector(".c").textContent=maxed?"MAX":(lv?"":"Unlock ")+priceText(pl);b.disabled=maxed||!pl.n||S.coins<pl.total;});}
 
 // ---------- Boss room: a top-down arena you walk around in ----------
 const RW=900,RH=540,WALL=40;
@@ -772,7 +793,7 @@ function loop(now){const dt=Math.min(0.05,(now-last)/1000);last=now;clock+=dt;
  saveT+=dt;if(saveT>5){saveT=0;save();}
  cloudT+=dt;if(cloudT>12){cloudT=0;cloudPush();}
  requestAnimationFrame(loop);}
-buildShop();buildEvo();buildPowerShop();paintAnvil();render();requestAnimationFrame(loop);
+buildAmt();buildShop();buildEvo();buildPowerShop();paintAnvil();render();requestAnimationFrame(loop);
 })();
 </script>
 
