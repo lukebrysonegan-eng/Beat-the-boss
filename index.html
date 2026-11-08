@@ -266,7 +266,17 @@ const TIERS=[
  {n:"Frost Anvil",cost:600000,mult:80,auto:4,c:["#f0fbff","#7fd3f5","#2b7fb0"],ash:"#123f5c",glow:"#7fd3f588"},
  {n:"Mythril Anvil",cost:1e7,mult:300,auto:6,c:["#e9fff4","#5ef0b0","#16956a"],ash:"#0b4a35",glow:"#5ef0b088"},
  {n:"Void Anvil",cost:2e8,mult:1200,auto:8,c:["#f1d6ff","#b45cf0","#5a1a8f"],ash:"#2c0a47",glow:"#b45cf099"},
- {n:"Star Anvil",cost:5e9,mult:6000,auto:12,c:["#ffffff","#ffe9a8","#ff7ad1"],ash:"#6e2a57",glow:"#fff3c4aa"}
+ {n:"Star Anvil",cost:5e9,mult:6000,auto:12,c:["#ffffff","#ffe9a8","#ff7ad1"],ash:"#6e2a57",glow:"#fff3c4aa"},
+ {n:"Ruby Anvil",cost:1e11,mult:25000,auto:14,c:["#ffd6dc","#e0234e","#7a0a22"],ash:"#3d0511",glow:"#e0234e88"},
+ {n:"Emerald Anvil",cost:3e12,mult:1e5,auto:16,c:["#d8ffe6","#1fbf63","#0a5a2c"],ash:"#052e16",glow:"#1fbf6388"},
+ {n:"Sapphire Anvil",cost:1e14,mult:4e5,auto:18,c:["#d6e4ff","#2f5fe0","#0f2470"],ash:"#081338",glow:"#2f5fe088"},
+ {n:"Obsidian Anvil",cost:5e15,mult:2e6,auto:20,c:["#8a7a9a","#2a2233","#0d0a11"],ash:"#000000",glow:"#9a6bff66"},
+ {n:"Thunder Anvil",cost:2e17,mult:1e7,auto:24,c:["#fffbd6","#ffe14d","#6b5cff"],ash:"#2a2266",glow:"#ffe14daa"},
+ {n:"Rainbow Anvil",cost:1e19,mult:5e7,auto:28,c:["#ff8a8a","#ffd166","#5ec8ff"],ash:"#6b3ea8",glow:"#ff7ad1aa"},
+ {n:"Galaxy Anvil",cost:5e20,mult:3e8,auto:32,c:["#e6c8ff","#6a3cc8","#0b0630"],ash:"#05021a",glow:"#8a7cffaa"},
+ {n:"Dragon Anvil",cost:3e22,mult:2e9,auto:36,c:["#ffe0b0","#ff4a1a","#4a0a00"],ash:"#2a0500",glow:"#ff4a1aaa"},
+ {n:"Cosmic Anvil",cost:2e24,mult:1.5e10,auto:40,c:["#ffffff","#7fffe0","#ff3dd6"],ash:"#3a0a4a",glow:"#7fffe0bb"},
+ {n:"Infinity Anvil",cost:1e27,mult:1e11,auto:50,c:["#ffffff","#ffd700","#ffffff"],ash:"#7a5a00",glow:"#ffffffcc"}
 ];
 
 const pm=lv=>(1+0.5*(Math.max(1,lv)-1))*(1+0.5*L("core"));
@@ -350,7 +360,7 @@ const cost=u=>Math.round(u.base*Math.pow(u.g,L(u.id)));
 const pcost=p=>Math.round(p.base*Math.pow(p.g,PL(p.id)));
 
 function fmt(n){n=Math.floor(n);if(n<1e4)return n.toLocaleString("en-US");
- const u=["K","M","B","T","Qa","Qi","Sx"];let i=-1;while(n>=1000&&i<u.length-1){n/=1000;i++;}return n.toFixed(n<10?2:n<100?1:0)+u[i];}
+ const u=["K","M","B","T","Qa","Qi","Sx","Sp","Oc","No","Dc","Ud","Dd","Td"];let i=-1;while(n>=1000&&i<u.length-1){n/=1000;i++;}return n.toFixed(n<10?2:n<100?1:0)+u[i];}
 
 const $=id=>document.getElementById(id);
 function flo(parent,x,y,txt,cls){const f=document.createElement("div");f.className="float "+(cls||"");f.textContent=txt;
