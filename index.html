@@ -232,7 +232,7 @@ const PILLARS=[
  [[300,270],[600,270]]
 ];
 const bossHp=i=>Math.round(30*Math.pow(5.2,i));
-const bossReward=i=>Math.round(bossHp(i)*1.2+20);
+const bossReward=i=>Math.round((bossHp(i)*1.2+20)*(1+0.5*L("map"))*crownMult());
 
 const UPS=[
  {id:"glove",n:"Forge Gloves",d:"+1 coin per tap",base:12,g:1.22},
@@ -245,7 +245,17 @@ const UPS=[
  {id:"armor",n:"Armor Plate",d:"Take 12% less damage from bosses",base:150,g:1.9,max:12},
  {id:"vit",n:"Heart Forge",d:"+20 max HP in boss fights",base:100,g:1.45},
  {id:"boots",n:"Swift Boots",d:"+8% move speed",base:120,g:1.8,max:10},
- {id:"hammer",n:"Golden Hammer",d:"Doubles coins per tap",base:2000,g:7}
+ {id:"hammer",n:"Golden Hammer",d:"Doubles coins per tap",base:2000,g:7},
+ {id:"map",n:"Treasure Map",d:"+50% coins from bosses",base:50000,g:3,max:20},
+ {id:"dglove",n:"Diamond Gloves",d:"+25 coins per tap",base:80000,g:1.28},
+ {id:"titan",n:"Titan Training",d:"+100 damage",base:1e6,g:1.28},
+ {id:"furnace",n:"Great Furnace",d:"+500 coins per second",base:2e6,g:1.3},
+ {id:"crystal",n:"Cooldown Crystal",d:"Powers recharge 5% faster",base:5e6,g:2.6,max:10},
+ {id:"core",n:"Power Core",d:"+50% damage for all super powers",base:2e7,g:3.2},
+ {id:"dhammer",n:"Diamond Hammer",d:"Triples coins per tap",base:5e7,g:12},
+ {id:"golem",n:"Forge Golem",d:"+20K coins per second",base:1e9,g:1.32},
+ {id:"mythic",n:"Mythic Blade",d:"x5 all damage",base:2e9,g:40},
+ {id:"crown",n:"Crown of Kings",d:"x2 coins from everything",base:1e12,g:50}
 ];
 
 const TIERS=[
@@ -259,7 +269,7 @@ const TIERS=[
  {n:"Star Anvil",cost:5e9,mult:6000,auto:12,c:["#ffffff","#ffe9a8","#ff7ad1"],ash:"#6e2a57",glow:"#fff3c4aa"}
 ];
 
-const pm=lv=>1+0.5*(Math.max(1,lv)-1);
+const pm=lv=>(1+0.5*(Math.max(1,lv)-1))*(1+0.5*L("core"));
 const POWERS=[
  {id:"fist",n:"Fire Fist",k:"1",cd:8,base:400,g:3,d:lv=>`Throws a fireball for ${fmt(40*pm(lv))}x your damage`},
  {id:"bolt",n:"Lightning Storm",k:"2",cd:14,base:4000,g:3,d:lv=>`8 bolts, each ${fmt(8*pm(lv))}x your damage`},
@@ -270,7 +280,17 @@ const POWERS=[
  {id:"shield",n:"Shield Bubble",k:"7",cd:22,base:8000,g:3,max:6,d:lv=>`Nothing can hurt you for ${(3+0.5*(Math.max(1,lv)-1)).toFixed(1)}s`},
  {id:"clones",n:"Shadow Clones",k:"8",cd:24,base:50000,g:3,max:5,d:lv=>`${1+Math.max(1,lv)} clones attack the boss for 6s`},
  {id:"ice",n:"Ice Spikes",k:"9",cd:16,base:300000,g:3,d:lv=>`${fmt(20*pm(lv))}x damage and slows the boss for 5s`},
- {id:"whirl",n:"Whirlwind",k:"0",cd:18,base:4000000,g:3,d:lv=>`Spin for 3s: ${fmt(5*pm(lv))}x damage 4 times a second and blocks bullets`}
+ {id:"whirl",n:"Whirlwind",k:"0",cd:18,base:4000000,g:3,d:lv=>`Spin for 3s: ${fmt(5*pm(lv))}x damage 4 times a second and blocks bullets`},
+ {id:"hole",n:"Black Hole",k:"Q",cd:30,base:1e7,g:3.5,d:lv=>`Traps the boss for 4s, eats bullets, ${fmt(8*pm(lv))}x damage 4 times a second`},
+ {id:"breath",n:"Dragon Breath",k:"E",cd:20,base:3e7,g:3.5,d:lv=>`Breathe fire for 2.5s: ${fmt(15*pm(lv))}x damage every 0.15s`},
+ {id:"quake",n:"Earthquake",k:"R",cd:30,base:1e8,g:3.5,d:lv=>`${fmt(400*pm(lv))}x damage and stuns the boss for 2s`},
+ {id:"steal",n:"Life Steal",k:"T",cd:25,base:3e8,g:3.5,max:5,d:lv=>`For 8s each attack heals you ${3+Math.max(1,lv)}% HP`},
+ {id:"gold",n:"Golden Touch",k:"Y",cd:30,base:1e9,g:3.5,d:lv=>`For 10s each attack also earns ${fmt(5*Math.max(1,lv))}x your coins per tap`},
+ {id:"swords",n:"Sword Rain",k:"U",cd:28,base:5e9,g:3.5,d:lv=>`20 swords fall on the boss, each ${fmt(30*pm(lv))}x damage`},
+ {id:"phoenix",n:"Phoenix Feather",k:"I",cd:45,base:2e10,g:4,max:3,d:lv=>`For ${10+5*Math.max(1,lv)}s, if you get knocked out you come back with full HP`},
+ {id:"giant",n:"Giant Mode",k:"O",cd:35,base:1e11,g:4,d:lv=>`Grow huge for 8s: double reach and ${fmt(4*pm(lv))}x attack damage`},
+ {id:"wind",n:"Second Wind",k:"P",cd:60,base:5e11,g:4,max:3,d:lv=>lv>=2?"Full heal and resets all your other powers":"Full heal (at Lv 2 it also resets your other powers)"},
+ {id:"nova",n:"Supernova",k:"L",cd:90,base:1e13,g:5,d:lv=>`A star explodes for ${fmt(5000*pm(lv))}x damage`}
 ];
 
 let S;
@@ -318,9 +338,10 @@ const PL=id=>S.pw[id]||0;
 const rebMult=()=>1+0.5*S.reb;
 const trophyMult=()=>Math.pow(1.4,S.beaten);
 const tier=()=>TIERS[S.anvil||0];
-const perTap=()=>(1+L("glove"))*Math.pow(2,L("hammer"))*tier().mult*trophyMult()*rebMult();
-const perSec=()=>(L("bellows")+8*L("apprentice"))*trophyMult()*rebMult()+tier().auto*perTap();
-const dmg=()=>(1+2*L("str"))*Math.pow(2,L("blade"))*rebMult();
+const crownMult=()=>Math.pow(2,L("crown"));
+const perTap=()=>(1+L("glove")+25*L("dglove"))*Math.pow(2,L("hammer"))*Math.pow(3,L("dhammer"))*tier().mult*trophyMult()*rebMult()*crownMult();
+const perSec=()=>(L("bellows")+8*L("apprentice")+500*L("furnace")+20000*L("golem"))*trophyMult()*rebMult()*crownMult()+tier().auto*perTap();
+const dmg=()=>(1+2*L("str")+100*L("titan"))*Math.pow(2,L("blade"))*Math.pow(5,L("mythic"))*rebMult();
 const crit=()=>0.05*L("charm");
 const fightTime=()=>30+3*L("glass");
 const taken=()=>Math.pow(0.88,L("armor"));
@@ -407,6 +428,8 @@ const RW=900,RH=540,WALL=40;
 let F=null; // the live fight
 let shake=0, clock=0;
 let cd={}, freezeT=0, rageT=0, fx=[], boltQ=[], shieldT=0, cloneT=0, cloneTick=0, slowT=0, whirlT=0, whirlTick=0;
+let holeT=0, holeTick=0, breathT=0, breathTick=0, stunT=0, stealT=0, goldT=0, swordQ=[], phoenixT=0, giantT=0;
+const reach=()=>62*(giantT>0?2:1);
 const keys={};
 let joy=null; // {id,ox,oy,x,y}
 
@@ -422,7 +445,8 @@ function enterRoom(){
  F={i,hp:bossHp(i),max:bossHp(i),tLeft:fightTime(),total:fightTime(),
   px:RW/2,py:RH-110,face:-Math.PI/2,php:maxHp(),pmax:maxHp(),inv:0,atkCD:0,swingT:0,dashT:0,dashCD:0,dx:0,dy:-1,
   bx:RW/2,by:170,br:bossSize(i),bstate:"walk",bt:1.6,cdir:0,flash:0,hazards:[],bullets:[],pillars:PILLARS[ROOMS[i].pil]};
- cd={};freezeT=0;rageT=0;fx=[];boltQ=[];joy=null;shieldT=0;cloneT=0;slowT=0;whirlT=0;for(const k in keys)keys[k]=false;
+ cd={};freezeT=0;rageT=0;fx=[];boltQ=[];joy=null;shieldT=0;cloneT=0;slowT=0;whirlT=0;
+ holeT=0;breathT=0;stunT=0;stealT=0;goldT=0;swordQ=[];phoenixT=0;giantT=0;for(const k in keys)keys[k]=false;
  $("roomName").textContent=ROOMS[i].n;$("roomBoss").textContent=BOSSES[i].n;$("roomBoss").style.color=ROOMS[i].light;
  buildPowerBar();
  $("room").hidden=false;document.body.style.overflow="hidden";$("msg").textContent="";
@@ -452,7 +476,10 @@ function hurt(frac,label){
  if(!F||F.inv>0||F.dashT>0||shieldT>0)return;
  const d=Math.max(1,Math.round(frac*100*taken()));F.php-=d;F.inv=0.9;shake=Math.min(20,shake+12);
  const [sx,sy]=toRoomXY(F.px,F.py-30);flo($("roomIn"),sx-20,sy-10,"-"+d+" HP","hurt");
- if(F.php<=0){F.php=0;lose("knocked");}}
+ if(F.php<=0){
+  if(phoenixT>0){phoenixT=0;F.php=F.pmax;F.inv=2;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.9,r:260,c:"#ffb347"});
+   const [qx,qy]=toRoomXY(F.px,F.py-40);flo($("roomIn"),qx-40,qy-20,"REVIVED!","power");return;}
+  F.php=0;lose("knocked");}}
 
 // --- Player actions
 function attack(){
@@ -461,8 +488,10 @@ function attack(){
  F.face=Math.atan2(F.by-F.py,F.bx-F.px);
  const dist=Math.hypot(F.bx-F.px,F.by-F.py);
  const hx=F.px+Math.cos(F.face)*34,hy=F.py+Math.sin(F.face)*34;
- if(dist<F.br+62){
-  let d=dmg(),isC=Math.random()<crit();if(isC)d*=3;if(rageT>0)d*=2+PL("rage");
+ if(dist<F.br+reach()){
+  let d=dmg(),isC=Math.random()<crit();if(isC)d*=3;if(rageT>0)d*=2+PL("rage");if(giantT>0)d*=4*pm(PL("giant"));
+  if(stealT>0)F.php=Math.min(F.pmax,F.php+F.pmax*(3+PL("steal"))/100);
+  if(goldT>0)S.coins+=perTap()*5*PL("gold");
   fx.push({t:"spark",x:hx,y:hy,age:0,life:.25});
   hitBoss(d,isC?"CRIT":"",isC?"crit":"dmg",hx,hy-10);
  } else fx.push({t:"whiff",x:hx,y:hy,age:0,life:.2});
@@ -479,7 +508,7 @@ function moveVec(){let mx=0,my=0;
  const m=Math.hypot(mx,my);if(m>1){mx/=m;my/=m;}return [mx,my];}
 
 document.addEventListener("keydown",e=>{if(!F)return;
- const P=POWERS.find(p=>p.k===e.key);if(P){usePower(P.id);return;}
+ const P=POWERS.find(p=>p.k.toLowerCase()===String(e.key).toLowerCase());if(P){usePower(P.id);return;}
  if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","Space"].includes(e.code))e.preventDefault();
  if(e.code==="Space"||e.code==="KeyJ"){if(!e.repeat)attack();return;}
  if(e.code==="ShiftLeft"||e.code==="ShiftRight"||e.code==="KeyK"){dash();return;}
@@ -502,7 +531,7 @@ $("btnDash").addEventListener("pointerdown",e=>{e.preventDefault();dash();});
 // --- Powers
 function usePower(id){
  const P=POWERS.find(p=>p.id===id);if(!F||!P||PL(id)<1||(cd[id]||0)>0)return;
- const lv=PL(id);cd[id]=P.cd;
+ const lv=PL(id);cd[id]=P.cd*(1-0.05*L("crystal"));
  if(id==="fist")fx.push({t:"fireball",x:F.px,y:F.py,age:0,life:.35,sx:F.px,sy:F.py,end:()=>{fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:.5,r:150,c:"#ff8a3d"});hitBoss(dmg()*40*pm(lv),"FIRE FIST","power");}});
  if(id==="bolt"){for(let k=0;k<8;k++)boltQ.push(clock+k*0.18);}
  if(id==="freeze"){freezeT=3+2*lv;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.6,r:600,c:"#9fe6ff"});}
@@ -514,13 +543,24 @@ function usePower(id){
  if(id==="clones"){cloneT=6;cloneTick=0;}
  if(id==="ice"){slowT=5;fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:.6,r:200,c:"#9fe6ff"});hitBoss(dmg()*20*pm(lv),"ICE","power");}
  if(id==="whirl"){whirlT=3;whirlTick=0;}
+ if(id==="hole"){holeT=4;holeTick=0;}
+ if(id==="breath"){breathT=2.5;breathTick=0;}
+ if(id==="quake"){stunT=2;shake=30;fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:.8,r:500,c:"#a8763e"});hitBoss(dmg()*400*pm(lv),"QUAKE","power");}
+ if(id==="steal"){stealT=8;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.5,r:120,c:"#c23b5a"});}
+ if(id==="gold"){goldT=10;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.5,r:140,c:"#ffd166"});}
+ if(id==="swords"){for(let k=0;k<20;k++)swordQ.push(clock+k*0.1);}
+ if(id==="phoenix"){phoenixT=10+5*lv;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.6,r:160,c:"#ff7a3d"});}
+ if(id==="giant"){giantT=8;}
+ if(id==="wind"){F.php=F.pmax;if(lv>=2)for(const k in cd)if(k!=="wind")cd[k]=0;fx.push({t:"burst",x:F.px,y:F.py,age:0,life:.7,r:300,c:"#7bd88f"});}
+ if(id==="nova"){shake=40;fx.push({t:"burst",x:F.bx,y:F.by,age:0,life:1.2,r:1000,c:"#fff3c4"});hitBoss(dmg()*5000*pm(lv),"SUPERNOVA","power");}
+ if(!F)return;
  render();
 }
 function buildPowerBar(){const el=$("powerBar");el.innerHTML="";let any=false;
  POWERS.forEach(p=>{if(PL(p.id)<1)return;any=true;const b=document.createElement("button");b.className="pw";b.id="pw-"+p.id;
   b.innerHTML=`<span class="pn">${p.n}</span><small>Key ${p.k}</small><span class="cdv"></span><span class="cdt"></span>`;
   b.addEventListener("pointerdown",e=>{e.preventDefault();usePower(p.id);});el.appendChild(b);});
- $("roomHint").textContent="Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift"+(any?" · Powers: number keys 1–9 and 0":" · Unlock Super Powers on the main screen");}
+ $("roomHint").textContent="Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift"+(any?" · Powers: keys 1–0 and Q E R T Y U I O P L":" · Unlock Super Powers on the main screen");}
 function renderPowerBar(){POWERS.forEach(p=>{const b=$("pw-"+p.id);if(!b)return;const c=cd[p.id]||0;
  b.style.setProperty("--p",c/p.cd);b.disabled=c>0;b.querySelector(".cdt").textContent=c>0?Math.ceil(c):"";});}
 
@@ -556,7 +596,7 @@ function update(dt){
  collide(o,16);F.px=o.x;F.py=o.y;
  // boss
  F.flash=Math.max(0,F.flash-dt*6);
- if(!frozen){
+ if(!frozen&&stunT<=0&&holeT<=0){
   F.bt-=dt;const ang=Math.atan2(F.py-F.by,F.px-F.bx);let b={x:F.bx,y:F.by};
   if(F.bstate==="walk"){const bs=(55+Math.min(F.i,11)*9)*(slowT>0?0.45:1);b.x+=Math.cos(ang)*bs*dt;b.y+=Math.sin(ang)*bs*dt;if(F.bt<=0)bossAttack();}
   else if(F.bstate==="wind"){if(F.bt<=0){F.bstate="charge";F.bt=0.55;}}
@@ -576,6 +616,15 @@ function update(dt){
   const e=pts[pts.length-1];hitBoss(dmg()*8*pm(PL("bolt")),"ZAP","power",e[0],e[1]);}
  if(!F)return;
  shieldT=Math.max(0,shieldT-dt);slowT=Math.max(0,slowT-dt);
+ stunT=Math.max(0,stunT-dt);stealT=Math.max(0,stealT-dt);goldT=Math.max(0,goldT-dt);phoenixT=Math.max(0,phoenixT-dt);giantT=Math.max(0,giantT-dt);
+ if(holeT>0){holeT-=dt;holeTick-=dt;F.bullets=F.bullets.filter(q=>Math.hypot(q.x-F.bx,q.y-F.by)>220);
+  if(holeTick<=0){holeTick=0.25;hitBoss(dmg()*8*pm(PL("hole")),"VOID","power");}}
+ if(!F)return;
+ if(breathT>0){breathT-=dt;breathTick-=dt;if(breathTick<=0){breathTick=0.15;hitBoss(dmg()*15*pm(PL("breath")),"","crit");}}
+ if(!F)return;
+ while(F&&swordQ.length&&swordQ[0]<=clock){swordQ.shift();const x=F.bx+(Math.random()-.5)*F.br*1.6,y=F.by+(Math.random()-.5)*F.br;
+  fx.push({t:"sword",x,y,age:0,life:.25});hitBoss(dmg()*30*pm(PL("swords")),"","dmg",x,y);}
+ if(!F)return;
  if(cloneT>0){cloneT-=dt;cloneTick-=dt;if(cloneTick<=0){cloneTick=0.4;const n=Math.min(6,1+PL("clones"));hitBoss(dmg()*n*2,"CLONES","dmg");}}
  if(!F)return;
  if(whirlT>0){whirlT-=dt;whirlTick-=dt;F.bullets=F.bullets.filter(q=>Math.hypot(q.x-F.px,q.y-F.py)>110);
@@ -709,6 +758,8 @@ function drawFx(ctx){
    for(const [w,c] of [[14,"#7fd3f566"],[4,"#ffffff"]]){ctx.strokeStyle=c;ctx.lineWidth=w;ctx.beginPath();ctx.moveTo(f.pts[0][0],f.pts[0][1]);
     for(const q of f.pts)ctx.lineTo(q[0],q[1]);ctx.stroke();}
    if(p<0.25){ctx.fillStyle="#ffffff18";ctx.fillRect(0,0,RW,RH);}}
+  else if(f.t==="sword"){const y=f.y-140*(1-p);ctx.globalAlpha=1;ctx.fillStyle="#dfe6ee";ctx.fillRect(f.x-4,y-44,8,44);
+   ctx.fillStyle="#ffd166";ctx.fillRect(f.x-12,y-50,24,6);ctx.fillStyle="#6b4a2a";ctx.fillRect(f.x-3,y-66,6,16);}
   else if(f.t==="meteor"&&F){const sx=RW*1.05,sy=-60,ex=F.bx,ey=F.by;const x=sx+(ex-sx)*p,y=sy+(ey-sy)*p*p;
    ctx.globalAlpha=1;
    for(let k=6;k>0;k--){ctx.fillStyle=k%2?"#ff8a3d55":"#ffd16644";ctx.beginPath();ctx.arc(x+k*16,y-k*14,36-k*3,0,Math.PI*2);ctx.fill();}
@@ -740,7 +791,8 @@ function drawLive(t){if(!F)return;const R=ROOMS[F.i],ctx=rx;
   ctx.lineTo(F.bx+Math.cos(F.cdir)*420,F.by+Math.sin(F.cdir)*420);ctx.stroke();}
  // order by y so the one in front draws last
  const heroFirst=F.py<F.by;
- const hero=()=>drawHero(ctx,F.px,F.py,F.face,F.swingT,F.inv>0&&Math.floor(clock*16)%2===0,rageT>0);
+ const hero=()=>{const g=giantT>0?1.7:1;ctx.save();ctx.translate(F.px,F.py);ctx.scale(g,g);
+  drawHero(ctx,0,0,F.face,F.swingT,F.inv>0&&Math.floor(clock*16)%2===0,rageT>0,goldT>0?"#ffcf3d":null);ctx.restore();};
  if(heroFirst)hero();
  drawBoss(ctx,F.bx,F.by,F.br,F.i,true,F.flash,t);
  if(!heroFirst)hero();
@@ -750,6 +802,14 @@ function drawLive(t){if(!F)return;const R=ROOMS[F.i],ctx=rx;
  if(whirlT>0){ctx.strokeStyle="#ffd166";ctx.lineWidth=5;for(let k=0;k<3;k++){const a=clock*14+k*Math.PI*2/3;ctx.globalAlpha=0.8;ctx.beginPath();ctx.arc(F.px,F.py,70+k*12,a,a+1.2);ctx.stroke();}ctx.globalAlpha=1;}
  if(shieldT>0){ctx.fillStyle="#7fd3f533";ctx.strokeStyle="#bff0ff";ctx.lineWidth=3;ctx.beginPath();ctx.arc(F.px,F.py,30+Math.sin(clock*8)*2,0,Math.PI*2);ctx.fill();ctx.stroke();}
  for(const q of F.bullets){ctx.fillStyle=R.light;ctx.beginPath();ctx.arc(q.x,q.y,q.r,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffffff";ctx.beginPath();ctx.arc(q.x,q.y,q.r*0.45,0,Math.PI*2);ctx.fill();}
+ if(holeT>0){const g=ctx.createRadialGradient(F.bx,F.by,10,F.bx,F.by,F.br+90);g.addColorStop(0,"#000000ee");g.addColorStop(0.6,"#3a0f66aa");g.addColorStop(1,"#3a0f6600");
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(F.bx,F.by,F.br+90,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#c46bff";ctx.lineWidth=3;
+  for(let k=0;k<3;k++){const a=-clock*5+k*2.1;ctx.beginPath();ctx.arc(F.bx,F.by,F.br+30+k*18,a,a+1.4);ctx.stroke();}}
+ if(breathT>0){const a=Math.atan2(F.by-F.py,F.bx-F.px),L2=Math.hypot(F.bx-F.px,F.by-F.py);
+  for(let k=0;k<14;k++){const d=((clock*600+k*47)%Math.max(60,L2)),w=6+d*0.12,j=Math.sin(clock*30+k)*w*0.6;
+   ctx.globalAlpha=0.75;ctx.fillStyle=k%3?"#ff8a3d":"#ffd166";ctx.beginPath();ctx.arc(F.px+Math.cos(a)*d-Math.sin(a)*j,F.py+Math.sin(a)*d+Math.cos(a)*j,w,0,Math.PI*2);ctx.fill();}ctx.globalAlpha=1;}
+ if(stunT>0){ctx.fillStyle="#ffd166";ctx.font="22px Bungee, Impact, sans-serif";ctx.textAlign="center";ctx.fillText("STUNNED",F.bx,F.by-F.br-24);}
+ if(phoenixT>0){ctx.strokeStyle="#ff7a3d";ctx.lineWidth=2;ctx.beginPath();ctx.arc(F.px,F.py-34,8+Math.sin(clock*6)*2,0,Math.PI*2);ctx.stroke();}
  drawFx(ctx);drawParticles(ctx,R,t);
  ctx.restore();
  if(freezeT>0){ctx.fillStyle="#7fd3f530";ctx.fillRect(0,0,RW,RH);
@@ -757,7 +817,7 @@ function drawLive(t){if(!F)return;const R=ROOMS[F.i],ctx=rx;
  if(rageT>0){const g=ctx.createRadialGradient(RW/2,RH/2,RH*0.3,RW/2,RH/2,RW*0.6);g.addColorStop(0,"#ff3b4f00");g.addColorStop(1,"#ff3b4f88");ctx.fillStyle=g;ctx.fillRect(0,0,RW,RH);
   ctx.fillStyle="#ffd0d4";ctx.font="24px Bungee, Impact, sans-serif";ctx.textAlign="center";ctx.fillText("RAGE x"+(2+PL("rage")),RW/2,freezeT>0?118:84);}
  // range ring hint when close enough to hit
- if(Math.hypot(F.bx-F.px,F.by-F.py)<F.br+62){ctx.strokeStyle="#ffd16699";ctx.lineWidth=2;ctx.setLineDash([6,6]);ctx.beginPath();ctx.arc(F.px,F.py,24,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+ if(Math.hypot(F.bx-F.px,F.by-F.py)<F.br+reach()){ctx.strokeStyle="#ffd16699";ctx.lineWidth=2;ctx.setLineDash([6,6]);ctx.beginPath();ctx.arc(F.px,F.py,24,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
  // joystick
  if(joy){ctx.strokeStyle="#ffffff55";ctx.lineWidth=3;ctx.beginPath();ctx.arc(joy.ox,joy.oy,50,0,Math.PI*2);ctx.stroke();
   const jx=joy.x-joy.ox,jy=joy.y-joy.oy,m=Math.hypot(jx,jy),k=m>50?50/m:1;ctx.fillStyle="#ffffff66";ctx.beginPath();ctx.arc(joy.ox+jx*k,joy.oy+jy*k,22,0,Math.PI*2);ctx.fill();}

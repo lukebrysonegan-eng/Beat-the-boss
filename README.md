@@ -11,4 +11,4 @@ Open `index.html` in any browser. Progress saves in that browser.
 - Move: WASD or arrow keys (on a phone, drag on the left half of the room)
 - Attack: Space, click, or tap the right half of the room
 - Dash: Shift
-- Super powers: number keys 1–9 and 0
+- Super powers: keys 1–0 and Q E R T Y U I O P L
