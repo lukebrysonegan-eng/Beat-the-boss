@@ -466,7 +466,7 @@ function enterRoom(){
  try{const el=document.documentElement,rq=el.requestFullscreen||el.webkitRequestFullscreen;if(rq&&!document.fullscreenElement){const pr=rq.call(el);if(pr&&pr.catch)pr.catch(()=>{});}}catch(_){}
  render();
 }
-function closeRoom(){F=null;boltQ=[];fx=[];joy=null;$("room").hidden=true;document.body.style.overflow="";
+function closeRoom(){F=null;boltQ=[];fx=[];joy=null;look=null;try{if(document.pointerLockElement)document.exitPointerLock();}catch(_){}$("room").hidden=true;document.body.style.overflow="";
  try{if(document.fullscreenElement&&document.exitFullscreen){const pr=document.exitFullscreen();if(pr&&pr.catch)pr.catch(()=>{});}}catch(_){}}
 $("fight").addEventListener("click",enterRoom);
 $("cv").addEventListener("click",enterRoom);
@@ -480,6 +480,7 @@ function box(){const r=rcv.getBoundingClientRect(),s=Math.min(r.width/RW,r.heigh
  return {left:r.left+(r.width-RW*s)/2,top:r.top+(r.height-RH*s)/2,s};}
 function toRoomXY(x,y){const p=$("roomIn").getBoundingClientRect();
  if(G&&F){const r=stageEl.getBoundingClientRect(),v=new G.T.Vector3(x-RW/2,40,y-RH/2).project(G.camera);
+  if(v.z>1||Math.abs(v.x)>1.2||Math.abs(v.y)>1.2){v.x=(Math.random()-.5)*0.3;v.y=0.2;}
   return [r.left-p.left+(v.x+1)/2*r.width, r.top-p.top+(1-v.y)/2*r.height];}
  const b=box();return [b.left-p.left+x*b.s, b.top-p.top+y*b.s];}
 function hitBoss(d,label,cls,x,y){
@@ -500,10 +501,11 @@ function hurt(frac,label){
 function attack(){
  if(!F||F.atkCD>0)return;
  F.atkCD=rageT>0?0.13:0.2;F.swingT=0.16;
- F.face=Math.atan2(F.by-F.py,F.bx-F.px);
+ const toB=Math.atan2(F.by-F.py,F.bx-F.px);if(!G)F.face=toB;
  const dist=Math.hypot(F.bx-F.px,F.by-F.py);
+ const aimed=!G||Math.abs(angDiff(F.face,toB))<0.75;
  const hx=F.px+Math.cos(F.face)*34,hy=F.py+Math.sin(F.face)*34;
- if(dist<F.br+reach()){
+ if(dist<F.br+reach()&&aimed){
   let d=dmg(),isC=Math.random()<crit();if(isC)d*=3;if(rageT>0)d*=2+PL("rage");if(giantT>0)d*=4*pm(PL("giant"));
   if(stealT>0)F.php=Math.min(F.pmax,F.php+F.pmax*(3+PL("steal"))/100);
   if(goldT>0)S.coins+=perTap()*5*PL("gold");
@@ -513,11 +515,15 @@ function attack(){
 }
 function dash(){
  if(!F||F.dashCD>0)return;
- let [mx,my]=moveVec();if(!mx&&!my){mx=Math.cos(F.face);my=Math.sin(F.face);}
+ let [mx,my]=worldMove();if(!mx&&!my){mx=Math.cos(F.face);my=Math.sin(F.face);}
  const m=Math.hypot(mx,my);F.dx=mx/m;F.dy=my/m;F.dashT=0.18;F.dashCD=0.9;
 }
-function moveVec(){let mx=0,my=0;
- if(keys.ArrowLeft||keys.KeyA)mx--;if(keys.ArrowRight||keys.KeyD)mx++;
+const angDiff=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
+// In first person, W/S go forward/back along where you look and A/D strafe.
+function worldMove(){const [mx,my]=moveVec();if(!G||!F)return [mx,my];const f=-my,s=mx,a=F.face;
+ return [Math.cos(a)*f+Math.cos(a+Math.PI/2)*s, Math.sin(a)*f+Math.sin(a+Math.PI/2)*s];}
+function moveVec(){let mx=0,my=0;const ar=!G;
+ if((ar&&keys.ArrowLeft)||keys.KeyA)mx--;if((ar&&keys.ArrowRight)||keys.KeyD)mx++;
  if(keys.ArrowUp||keys.KeyW)my--;if(keys.ArrowDown||keys.KeyS)my++;
  if(joy){const jx=joy.x-joy.ox,jy=joy.y-joy.oy,m=Math.hypot(jx,jy);if(m>8){mx=jx/Math.max(m,50);my=jy/Math.max(m,50);}}
  const m=Math.hypot(mx,my);if(m>1){mx/=m;my/=m;}return [mx,my];}
@@ -534,13 +540,22 @@ window.addEventListener("blur",()=>{for(const k in keys)keys[k]=false;joy=null;}
 const stageEl=document.querySelector(".stage");
 function canvasXY(e){if(G){const r=stageEl.getBoundingClientRect();return [(e.clientX-r.left)/r.width*RW,(e.clientY-r.top)/r.height*RH];}
  const b=box();return [(e.clientX-b.left)/b.s,(e.clientY-b.top)/b.s];}
+let look=null; // a finger or mouse drag that turns the first-person view
 stageEl.addEventListener("pointerdown",e=>{
  if(!F)return;e.preventDefault();const [x,y]=canvasXY(e);
- if(e.pointerType!=="mouse"&&x<RW*0.5&&!joy){joy={id:e.pointerId,ox:x,oy:y,x,y};try{stageEl.setPointerCapture(e.pointerId);}catch(_){}}
- else attack();
+ if(e.pointerType!=="mouse"&&x<RW*0.5&&!joy){joy={id:e.pointerId,ox:x,oy:y,x,y};try{stageEl.setPointerCapture(e.pointerId);}catch(_){}return;}
+ if(G){look={id:e.pointerId,lx:e.clientX,moved:0,touch:e.pointerType!=="mouse"};try{stageEl.setPointerCapture(e.pointerId);}catch(_){}
+  if(!look.touch){attack();if(!document.pointerLockElement&&stageEl.requestPointerLock){try{const pr=stageEl.requestPointerLock();if(pr&&pr.catch)pr.catch(()=>{});}catch(_){}}}
+  return;}
+ attack();
 });
-stageEl.addEventListener("pointermove",e=>{if(joy&&e.pointerId===joy.id){const [x,y]=canvasXY(e);joy.x=x;joy.y=y;}});
-const endJoy=e=>{if(joy&&e.pointerId===joy.id)joy=null;};
+stageEl.addEventListener("pointermove",e=>{
+ if(joy&&e.pointerId===joy.id){const [x,y]=canvasXY(e);joy.x=x;joy.y=y;return;}
+ if(document.pointerLockElement===stageEl)return;
+ if(look&&e.pointerId===look.id&&F){const dx=e.clientX-look.lx;look.lx=e.clientX;look.moved+=Math.abs(dx);F.face+=dx*(look.touch?0.009:0.005);}
+});
+document.addEventListener("mousemove",e=>{if(F&&G&&document.pointerLockElement===stageEl)F.face+=(e.movementX||0)*0.0028;});
+const endJoy=e=>{if(joy&&e.pointerId===joy.id)joy=null;if(look&&e.pointerId===look.id){if(look.touch&&look.moved<12)attack();look=null;}};
 stageEl.addEventListener("pointerup",endJoy);stageEl.addEventListener("pointercancel",endJoy);
 $("btnAtk").addEventListener("pointerdown",e=>{e.preventDefault();attack();});
 $("btnDash").addEventListener("pointerdown",e=>{e.preventDefault();dash();});
@@ -577,7 +592,7 @@ function buildPowerBar(){const el=$("powerBar");el.innerHTML="";let any=false;
  POWERS.forEach(p=>{if(PL(p.id)<1)return;any=true;const b=document.createElement("button");b.className="pw";b.id="pw-"+p.id;
   b.innerHTML=`<span class="pn">${p.n}</span><small>Key ${p.k}</small><span class="cdv"></span><span class="cdt"></span>`;
   b.addEventListener("pointerdown",e=>{e.preventDefault();usePower(p.id);});el.appendChild(b);});
- $("roomHint").textContent="Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift"+(any?" · Powers: keys 1–0 and Q E R T Y U I O P L":" · Unlock Super Powers on the main screen");}
+ $("roomHint").textContent=(G?"Move: WASD · Look: mouse (click to lock, Esc to free), drag, or ← → · Attack: click or Space · Phone: left side moves, drag right side to look, tap to hit · Dash: Shift":"Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift")+(any?" · Powers: keys 1–0 and Q E R T Y U I O P L":" · Unlock Super Powers on the main screen");}
 function renderPowerBar(){POWERS.forEach(p=>{const b=$("pw-"+p.id);if(!b)return;const c=cd[p.id]||0;
  b.style.setProperty("--p",c/p.cd);b.disabled=c>0;b.querySelector(".cdt").textContent=c>0?Math.ceil(c):"";});}
 
@@ -609,8 +624,11 @@ function update(dt){
  const sp=240*(1+0.08*L("boots"))*(rageT>0?1.3:1);
  let o={x:F.px,y:F.py};
  if(F.dashT>0){F.dashT-=dt;o.x+=F.dx*780*dt;o.y+=F.dy*780*dt;}
- else{const [mx,my]=moveVec();o.x+=mx*sp*dt;o.y+=my*sp*dt;if(mx||my)F.face=Math.atan2(my,mx);}
- collide(o,16);F.px=o.x;F.py=o.y;
+ else{const [mx,my]=worldMove();o.x+=mx*sp*dt;o.y+=my*sp*dt;if(!G&&(mx||my))F.face=Math.atan2(my,mx);}
+ if(G){if(keys.ArrowLeft)F.face-=2.6*dt;if(keys.ArrowRight)F.face+=2.6*dt;}
+ collide(o,16);
+ {const dx=o.x-F.bx,dy=o.y-F.by,d=Math.hypot(dx,dy),m=F.br+40;if(d<m){if(d>0.01){o.x=F.bx+dx/d*m;o.y=F.by+dy/d*m;}else o.y=F.by+m;collide(o,16);}} // you can't walk through the boss
+ F.px=o.x;F.py=o.y;
  // boss
  F.flash=Math.max(0,F.flash-dt*6);
  if(!frozen&&stunT<=0&&holeT<=0){
@@ -620,7 +638,7 @@ function update(dt){
   else if(F.bstate==="charge"){const cs=(520+Math.min(F.i,11)*25)*(slowT>0?0.5:1);b.x+=Math.cos(F.cdir)*cs*dt;b.y+=Math.sin(F.cdir)*cs*dt;
    if(F.bt<=0){F.bstate="walk";F.bt=Math.max(0.9,2.2-Math.min(F.i,11)*0.15);}}
   collide(b,F.br);F.bx=b.x;F.by=b.y;
-  if(Math.hypot(F.px-F.bx,F.py-F.by)<F.br+14)hurt(F.bstate==="charge"?0.28:0.12);
+  if(Math.hypot(F.px-F.bx,F.py-F.by)<F.br+(F.bstate==="charge"?50:30))hurt(F.bstate==="charge"?0.28:0.12);
   if(!F)return;
   for(const h of F.hazards){h.t+=dt;if(h.t>=h.tmax&&!h.done){h.done=true;fx.push({t:"burst",x:h.x,y:h.y,age:0,life:.35,r:h.r,c:ROOMS[F.i].light});
    if(Math.hypot(F.px-h.x,F.py-h.y)<h.r+10)hurt(0.24);if(!F)return;}}
@@ -955,7 +973,7 @@ function makeBoss(i){
 // Meshes for power effects that live for the whole fight; toggled on and off.
 function buildFixed(){
  const T=G.T,f={};
- f.shield=new T.Mesh(new T.SphereGeometry(36,24,16),new T.MeshStandardMaterial({color:0x7fd3f5,transparent:true,opacity:0.3,emissive:0x2a6a88}));
+ f.shield=new T.Mesh(new T.SphereGeometry(36,24,16),new T.MeshStandardMaterial({color:0x7fd3f5,transparent:true,opacity:0.25,emissive:0x2a6a88,side:T.DoubleSide,depthWrite:false}));
  f.whirl=new T.Group();for(let k=0;k<3;k++){const m=new T.Mesh(new T.TorusGeometry(70+k*12,3,6,30,1.3),basic(0xffd166,{transparent:true,opacity:0.85}));m.rotation.x=Math.PI/2;m.rotation.z=k*2.1;f.whirl.add(m);}
  f.hole=new T.Group();const core=new T.Mesh(new T.SphereGeometry(1,24,16),basic(0x08020f,{transparent:true,opacity:0.55}));f.hole.add(core);
  for(let k=0;k<3;k++){const m=new T.Mesh(new T.TorusGeometry(1,0.04,6,30,1.6),basic(0xc46bff));m.rotation.x=Math.PI/2;f.hole.add(m);}
@@ -968,10 +986,28 @@ function buildFixed(){
  for(let k=0;k<6;k++){const c=makeHero(0x6a4c9c,0.7);c.visible=false;G.fixed.add(c);G.clones.push(c);}
  G.fx=f;
 }
-if(G){buildFixed();G.hero=makeHero(0xff8a3d,1);G.scene.add(G.hero);}
+if(G){buildFixed();G.hero=makeHero(0xff8a3d,1);G.scene.add(G.hero);G.vm=makeVM();}
+// First-person arm and hammer, attached to the camera and drawn on top of the world.
+function makeVM(){const T=G.T,g=new T.Group(),pivot=new T.Group();
+ const arm=new T.Mesh(new T.CylinderGeometry(2.6,3.2,16,10),mat(0xff8a3d));arm.rotation.x=Math.PI/2;arm.position.set(0,-1,6);
+ const hand=new T.Mesh(new T.SphereGeometry(3.2,12,8),mat(0xf5d3b3));hand.position.set(0,0,-2);
+ const handle=new T.Mesh(new T.CylinderGeometry(1.2,1.2,22,8),mat(0x6b4a2a));handle.rotation.x=Math.PI/2;handle.position.set(0,0,-11);
+ const head=new T.Mesh(new T.BoxGeometry(13,8,8),mat(0xbbbbbb,{metalness:0.6,roughness:0.35}));head.position.set(0,0,-22);
+ pivot.add(arm,hand,handle,head);g.add(pivot);
+ g.traverse(o=>{if(o.isMesh){o.material.depthTest=false;o.renderOrder=999;}});
+ g.userData={pivot,head};g.visible=false;G.camera.add(g);G.scene.add(G.camera);return g;}
+function fpCamera(t){const cam=G.camera;if(cam.fov!==72){cam.fov=72;cam.updateProjectionMatrix();}
+ const sc=giantT>0?2.2:1.35,[x,z]=W3(F.px,F.py),eye=46*sc;
+ const mv=Math.hypot(F.px-(G.fpx==null?F.px:G.fpx),F.py-(G.fpy==null?F.py:G.fpy));G.fpx=F.px;G.fpy=F.py;G.walk=(G.walk||0)+mv*0.09;
+ const bob=Math.sin(G.walk)*Math.min(3,mv*0.8),sx=(Math.random()-.5)*shake*0.5,sy=(Math.random()-.5)*shake*0.5;
+ cam.position.set(x,eye+bob+sy,z);const a=F.face,up=Math.max(0,1-Math.hypot(F.bx-F.px,F.by-F.py)/420)*34;cam.lookAt(x+Math.cos(a)*100+sx,eye-16+up+bob,z+Math.sin(a)*100);
+ const vm=G.vm,s=F.swingT>0?F.swingT/0.16:0;vm.visible=true;
+ vm.userData.pivot.rotation.x=F.swingT>0?(-0.9+s*1.9):0.35+Math.sin(t*2)*0.03;
+ vm.position.set(15,-15+bob*0.4,-30);vm.scale.setScalar(0.75);vm.userData.head.material.color.set(TIERS[S.anvil||0].c[1]);}
 
 function setSize(w,h){const k=w+"x"+h;if(G.size===k)return;G.size=k;G.renderer.setSize(w,h,false);G.camera.aspect=w/h;G.camera.updateProjectionMatrix();}
-function placeCamera(t){const a=G.camera.aspect,f=Math.max(1,1.62/a);
+function placeCamera(t){if(G.camera.fov!==40){G.camera.fov=40;G.camera.updateProjectionMatrix();}if(G.vm)G.vm.visible=false;G.fpx=G.fpy=null;
+ const a=G.camera.aspect,f=Math.max(1,1.62/a);
  G.camera.position.set((Math.random()-.5)*shake,500*f+(Math.random()-.5)*shake,430*f);G.camera.lookAt(0,0,40);}
 function ensureBoss(i,sc){if(G.bossKey!==i){if(G.boss){G.scene.remove(G.boss);disposeAll(G.boss);}G.boss=makeBoss(i);G.scene.add(G.boss);G.bossKey=i;}G.boss.scale.setScalar(sc);}
 function particles(R,t){const a=G.parts.geometry.attributes.position,arr=a.array,n=arr.length/3;
@@ -1014,7 +1050,7 @@ function render3D(t){
  G.frame++;particles(R,t);G.flames.forEach((f,k)=>{f.scale.set(1,1+Math.sin(t*13+k*2)*0.18,1);});
  ensureBoss(F.i,1);
  const moving=Math.hypot(F.px-(G.lpx||F.px),F.py-(G.lpy||F.py))>0.3;G.lpx=F.px;G.lpy=F.py;
- const h=G.hero;h.visible=!(F.inv>0&&Math.floor(clock*16)%2===0);
+ const h=G.hero;h.visible=false; // first person: you are the camera
  poseHero(h,F.px,F.py,F.face,F.swingT,moving,t);h.scale.setScalar(giantT>0?2.2:1.35);
  h.userData.bodyM.color.set(goldT>0?0xffcf3d:rageT>0?0xff5d6c:0xff8a3d);h.userData.headM.color.set(TIERS[S.anvil||0].c[1]);
  poseBoss(F.bx,F.by,Math.atan2(F.py-F.by,F.px-F.bx),t,true);
@@ -1026,8 +1062,8 @@ function render3D(t){
  X.whirl.visible=whirlT>0;X.whirl.position.set(hx3,26,hz3);X.whirl.rotation.y=-clock*14;
  X.hole.visible=holeT>0;X.hole.position.set(bx3,F.br,bz3);X.hole.children[0].scale.setScalar(F.br*1.9);X.hole.children.forEach((m,k)=>{if(k){m.scale.setScalar(F.br+30+k*18);m.rotation.z=-clock*5+k*2.1;}});
  X.slow.visible=slowT>0;X.slow.position.set(bx3,6,bz3);X.slow.scale.setScalar(F.br+16);
- X.halo.visible=phoenixT>0;X.halo.position.set(hx3,(giantT>0?2.2:1.35)*66+Math.sin(clock*6)*2,hz3);
- X.reach.visible=Math.hypot(F.bx-F.px,F.by-F.py)<F.br+reach();X.reach.position.set(hx3,1.5,hz3);
+ X.halo.visible=false;X.halo.position.set(hx3,(giantT>0?2.2:1.35)*66+Math.sin(clock*6)*2,hz3);
+ X.reach.visible=false;X.reach.position.set(hx3,1.5,hz3);
  X.wind.visible=F.bstate==="wind";X.wind.position.set(bx3,0,bz3);X.wind.rotation.y=-F.cdir;X.windStrip.scale.y=F.br*1.6;
  const a=Math.atan2(F.by-F.py,F.bx-F.px),L2=Math.hypot(F.bx-F.px,F.by-F.py);
  X.breath.forEach((m,k)=>{m.visible=breathT>0;if(!m.visible)return;const d=((clock*600+k*47)%Math.max(60,L2)),w=6+d*0.12,j=Math.sin(clock*30+k)*w*0.6;
@@ -1043,7 +1079,7 @@ function render3D(t){
  sync(F.bullets,()=>{const m=new G.T.Mesh(G.geo.s,bmat);m.userData.shared=true;m.scale.setScalar(10);return m;},(q,m)=>{const [x,z]=W3(q.x,q.y);m.position.set(x,22,z);});
  sync(fx,fxMesh,fxUpdate);
  sweep();
- placeCamera(t);
+ fpCamera(t);
  G.renderer.render(G.scene,G.camera);
  drawHud(st);
 }
@@ -1054,6 +1090,28 @@ function drawHud(st){const dpr=Math.min(2,window.devicePixelRatio||1),w=Math.rou
  if(rageT>0){const g=c.createRadialGradient(W/2,H/2,H*0.3,W/2,H/2,Math.max(W,H)*0.65);g.addColorStop(0,"rgba(255,59,79,0)");g.addColorStop(1,"rgba(255,59,79,.5)");c.fillStyle=g;c.fillRect(0,0,W,H);
   c.fillStyle="#ffd0d4";c.font="22px Bungee, Impact, sans-serif";c.fillText("RAGE x"+(2+PL("rage")),W/2,freezeT>0?76:44);}
  if(stunT>0&&F){const v=new G.T.Vector3(F.bx-RW/2,F.br*2.3,F.by-RH/2).project(G.camera);c.fillStyle="#ffd166";c.font="20px Bungee, Impact, sans-serif";c.fillText("STUNNED",(v.x+1)/2*W,(1-v.y)/2*H);}
+ if(F){
+  const toB=Math.atan2(F.by-F.py,F.bx-F.px),aim=Math.abs(angDiff(F.face,toB))<0.75,near=Math.hypot(F.bx-F.px,F.by-F.py)<F.br+reach(),cxm=W/2,cym=H/2;
+  // red edges when you are standing in danger
+  const danger=F.hazards.some(h=>Math.hypot(F.px-h.x,F.py-h.y)<h.r+12)||F.bstate==="wind";
+  if(danger){const g=c.createRadialGradient(W/2,H/2,H*0.25,W/2,H/2,Math.max(W,H)*0.62);g.addColorStop(0,"rgba(255,59,79,0)");g.addColorStop(1,"rgba(255,59,79,"+(0.4+0.2*Math.sin(clock*20))+")");c.fillStyle=g;c.fillRect(0,0,W,H);
+   c.fillStyle="#ffdde1";c.font="22px Bungee, Impact, sans-serif";c.fillText(F.bstate==="wind"?"IT'S CHARGING — DODGE!":"MOVE!",W/2,H-28);}
+  if(F.inv>0.6){c.fillStyle="rgba(255,0,0,"+((F.inv-0.6)*0.9)+")";c.fillRect(0,0,W,H);}
+  // crosshair: gold when the boss is close enough and in front of you
+  const hot=aim&&near;c.strokeStyle=hot?"#ffd166":"rgba(255,255,255,.85)";c.lineWidth=2;c.beginPath();c.arc(cxm,cym,hot?12:7,0,7);
+  c.moveTo(cxm-20,cym);c.lineTo(cxm-8,cym);c.moveTo(cxm+8,cym);c.lineTo(cxm+20,cym);c.moveTo(cxm,cym-20);c.lineTo(cxm,cym-8);c.moveTo(cxm,cym+8);c.lineTo(cxm,cym+20);c.stroke();
+  if(near&&!aim){c.fillStyle="#ffd166";c.font="15px Bungee, Impact, sans-serif";c.fillText("TURN TO FACE THE BOSS",cxm,cym+46);}
+  if(!aim){const d=angDiff(toB,F.face);c.fillStyle="rgba(255,209,102,.9)";c.font="30px Bungee, Impact, sans-serif";c.fillText(d<0?"◀":"▶",d<0?28:W-28,H/2+10);}
+  if(phoenixT>0){c.fillStyle="#ff9a3d";c.font="14px Bungee, Impact, sans-serif";c.textAlign="left";c.fillText("PHOENIX READY",12,H-12);c.textAlign="center";}
+  // minimap
+  const mw=Math.min(190,W*0.3),mh=mw*RH/RW,m0=W-mw-10,n0=10,k=mw/RW;
+  c.fillStyle="rgba(0,0,0,.55)";c.fillRect(m0,n0,mw,mh);c.strokeStyle="rgba(255,255,255,.45)";c.lineWidth=1;c.strokeRect(m0,n0,mw,mh);
+  c.fillStyle="rgba(255,255,255,.25)";for(const [qx,qy] of F.pillars){c.beginPath();c.arc(m0+qx*k,n0+qy*k,28*k,0,7);c.fill();}
+  c.strokeStyle="#ff3b4f";for(const h of F.hazards){c.beginPath();c.arc(m0+h.x*k,n0+h.y*k,h.r*k,0,7);c.stroke();}
+  c.fillStyle=ROOMS[F.i].light;for(const q of F.bullets)c.fillRect(m0+q.x*k-1.5,n0+q.y*k-1.5,3,3);
+  c.fillStyle=BOSSES[F.i].c;c.beginPath();c.arc(m0+F.bx*k,n0+F.by*k,Math.max(4,F.br*k),0,7);c.fill();
+  const qx=m0+F.px*k,qy=n0+F.py*k,f=F.face;c.fillStyle="#ff8a3d";c.beginPath();c.moveTo(qx+Math.cos(f)*9,qy+Math.sin(f)*9);c.lineTo(qx+Math.cos(f+2.5)*6,qy+Math.sin(f+2.5)*6);c.lineTo(qx+Math.cos(f-2.5)*6,qy+Math.sin(f-2.5)*6);c.fill();
+ }
  if(joy){const sx=W/RW,sy=H/RH;c.strokeStyle="rgba(255,255,255,.4)";c.lineWidth=3;c.beginPath();c.arc(joy.ox*sx,joy.oy*sy,50,0,7);c.stroke();
   const jx=joy.x-joy.ox,jy=joy.y-joy.oy,m=Math.hypot(jx,jy),k=m>50?50/m:1;c.fillStyle="rgba(255,255,255,.45)";c.beginPath();c.arc((joy.ox+jx*k)*sx,(joy.oy+jy*k)*sy,22,0,7);c.fill();}
 }
