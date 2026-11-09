@@ -456,7 +456,7 @@ const bossSize=i=>34+Math.min(i,14)*2.6+(i===9||i===19?6:0);
 function enterRoom(){
  if(F)return;const i=S.sel;
  F={i,hp:bossHp(i),max:bossHp(i),tLeft:fightTime(),total:fightTime(),
-  px:RW/2,py:RH-110,face:-Math.PI/2,php:maxHp(),pmax:maxHp(),inv:0,atkCD:0,swingT:0,dashT:0,dashCD:0,dx:0,dy:-1,
+  px:RW/2,py:RH-110,face:-Math.PI/2,pitch:-0.12,php:maxHp(),pmax:maxHp(),inv:0,atkCD:0,swingT:0,dashT:0,dashCD:0,dx:0,dy:-1,
   bx:RW/2,by:170,br:bossSize(i),bstate:"walk",bt:1.6,cdir:0,flash:0,hazards:[],bullets:[],pillars:PILLARS[ROOMS[i].pil]};
  cd={};freezeT=0;rageT=0;fx=[];boltQ=[];joy=null;shieldT=0;cloneT=0;slowT=0;whirlT=0;
  holeT=0;breathT=0;stunT=0;stealT=0;goldT=0;swordQ=[];phoenixT=0;giantT=0;for(const k in keys)keys[k]=false;
@@ -524,7 +524,7 @@ function worldMove(){const [mx,my]=moveVec();if(!G||!F)return [mx,my];const f=-m
  return [Math.cos(a)*f+Math.cos(a+Math.PI/2)*s, Math.sin(a)*f+Math.sin(a+Math.PI/2)*s];}
 function moveVec(){let mx=0,my=0;const ar=!G;
  if((ar&&keys.ArrowLeft)||keys.KeyA)mx--;if((ar&&keys.ArrowRight)||keys.KeyD)mx++;
- if(keys.ArrowUp||keys.KeyW)my--;if(keys.ArrowDown||keys.KeyS)my++;
+ if((ar&&keys.ArrowUp)||keys.KeyW)my--;if((ar&&keys.ArrowDown)||keys.KeyS)my++;
  if(joy){const jx=joy.x-joy.ox,jy=joy.y-joy.oy,m=Math.hypot(jx,jy);if(m>8){mx=jx/Math.max(m,50);my=jy/Math.max(m,50);}}
  const m=Math.hypot(mx,my);if(m>1){mx/=m;my/=m;}return [mx,my];}
 
@@ -544,7 +544,7 @@ let look=null; // a finger or mouse drag that turns the first-person view
 stageEl.addEventListener("pointerdown",e=>{
  if(!F)return;e.preventDefault();const [x,y]=canvasXY(e);
  if(e.pointerType!=="mouse"&&x<RW*0.5&&!joy){joy={id:e.pointerId,ox:x,oy:y,x,y};try{stageEl.setPointerCapture(e.pointerId);}catch(_){}return;}
- if(G){look={id:e.pointerId,lx:e.clientX,moved:0,touch:e.pointerType!=="mouse"};try{stageEl.setPointerCapture(e.pointerId);}catch(_){}
+ if(G){look={id:e.pointerId,lx:e.clientX,ly:e.clientY,moved:0,touch:e.pointerType!=="mouse"};try{stageEl.setPointerCapture(e.pointerId);}catch(_){}
   if(!look.touch){attack();if(!document.pointerLockElement&&stageEl.requestPointerLock){try{const pr=stageEl.requestPointerLock();if(pr&&pr.catch)pr.catch(()=>{});}catch(_){}}}
   return;}
  attack();
@@ -552,9 +552,12 @@ stageEl.addEventListener("pointerdown",e=>{
 stageEl.addEventListener("pointermove",e=>{
  if(joy&&e.pointerId===joy.id){const [x,y]=canvasXY(e);joy.x=x;joy.y=y;return;}
  if(document.pointerLockElement===stageEl)return;
- if(look&&e.pointerId===look.id&&F){const dx=e.clientX-look.lx;look.lx=e.clientX;look.moved+=Math.abs(dx);F.face+=dx*(look.touch?0.009:0.005);}
+ if(look&&e.pointerId===look.id&&F){const dx=e.clientX-look.lx,dy=e.clientY-look.ly;look.lx=e.clientX;look.ly=e.clientY;look.moved+=Math.abs(dx)+Math.abs(dy);
+  const k=look.touch?0.009:0.005;F.face+=dx*k;lookUD(-dy*k*0.85);}
 });
-document.addEventListener("mousemove",e=>{if(F&&G&&document.pointerLockElement===stageEl)F.face+=(e.movementX||0)*0.0028;});
+// Look up and down: positive = up. Kept between straight down-ish and high up.
+function lookUD(d){if(F)F.pitch=Math.max(-1.25,Math.min(1.1,(F.pitch||0)+d));}
+document.addEventListener("mousemove",e=>{if(F&&G&&document.pointerLockElement===stageEl){F.face+=(e.movementX||0)*0.0028;lookUD(-(e.movementY||0)*0.0024);}});
 const endJoy=e=>{if(joy&&e.pointerId===joy.id)joy=null;if(look&&e.pointerId===look.id){if(look.touch&&look.moved<12)attack();look=null;}};
 stageEl.addEventListener("pointerup",endJoy);stageEl.addEventListener("pointercancel",endJoy);
 $("btnAtk").addEventListener("pointerdown",e=>{e.preventDefault();attack();});
@@ -592,7 +595,7 @@ function buildPowerBar(){const el=$("powerBar");el.innerHTML="";let any=false;
  POWERS.forEach(p=>{if(PL(p.id)<1)return;any=true;const b=document.createElement("button");b.className="pw";b.id="pw-"+p.id;
   b.innerHTML=`<span class="pn">${p.n}</span><small>Key ${p.k}</small><span class="cdv"></span><span class="cdt"></span>`;
   b.addEventListener("pointerdown",e=>{e.preventDefault();usePower(p.id);});el.appendChild(b);});
- $("roomHint").textContent=(G?"Move: WASD · Look: mouse (click to lock, Esc to free), drag, or ← → · Attack: click or Space · Phone: left side moves, drag right side to look, tap to hit · Dash: Shift":"Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift")+(any?" · Powers: keys 1–0 and Q E R T Y U I O P L":" · Unlock Super Powers on the main screen");}
+ $("roomHint").textContent=(G?"Move: WASD · Look around and up/down: mouse (click to lock, Esc to free), drag, or arrow keys · Attack: click or Space · Phone: left side moves, drag right side to look, tap to hit · Dash: Shift":"Move: WASD / arrows (phone: drag left side) · Attack: Space, click, or tap right side · Dash: Shift")+(any?" · Powers: keys 1–0 and Q E R T Y U I O P L":" · Unlock Super Powers on the main screen");}
 function renderPowerBar(){POWERS.forEach(p=>{const b=$("pw-"+p.id);if(!b)return;const c=cd[p.id]||0;
  b.style.setProperty("--p",c/p.cd);b.disabled=c>0;b.querySelector(".cdt").textContent=c>0?Math.ceil(c):"";});}
 
@@ -625,7 +628,8 @@ function update(dt){
  let o={x:F.px,y:F.py};
  if(F.dashT>0){F.dashT-=dt;o.x+=F.dx*780*dt;o.y+=F.dy*780*dt;}
  else{const [mx,my]=worldMove();o.x+=mx*sp*dt;o.y+=my*sp*dt;if(!G&&(mx||my))F.face=Math.atan2(my,mx);}
- if(G){if(keys.ArrowLeft)F.face-=2.6*dt;if(keys.ArrowRight)F.face+=2.6*dt;}
+ if(G){if(keys.ArrowLeft)F.face-=2.6*dt;if(keys.ArrowRight)F.face+=2.6*dt;
+  if(keys.ArrowUp)lookUD(1.6*dt);if(keys.ArrowDown)lookUD(-1.6*dt);}
  collide(o,16);
  {const dx=o.x-F.bx,dy=o.y-F.by,d=Math.hypot(dx,dy),m=F.br+40;if(d<m){if(d>0.01){o.x=F.bx+dx/d*m;o.y=F.by+dy/d*m;}else o.y=F.by+m;collide(o,16);}} // you can't walk through the boss
  F.px=o.x;F.py=o.y;
@@ -1000,7 +1004,7 @@ function fpCamera(t){const cam=G.camera;if(cam.fov!==72){cam.fov=72;cam.updatePr
  const sc=giantT>0?2.2:1.35,[x,z]=W3(F.px,F.py),eye=46*sc;
  const mv=Math.hypot(F.px-(G.fpx==null?F.px:G.fpx),F.py-(G.fpy==null?F.py:G.fpy));G.fpx=F.px;G.fpy=F.py;G.walk=(G.walk||0)+mv*0.09;
  const bob=Math.sin(G.walk)*Math.min(3,mv*0.8),sx=(Math.random()-.5)*shake*0.5,sy=(Math.random()-.5)*shake*0.5;
- cam.position.set(x,eye+bob+sy,z);const a=F.face,up=Math.max(0,1-Math.hypot(F.bx-F.px,F.by-F.py)/420)*34;cam.lookAt(x+Math.cos(a)*100+sx,eye-16+up+bob,z+Math.sin(a)*100);
+ cam.position.set(x,eye+bob+sy,z);const a=F.face,p=F.pitch||0,cp=Math.cos(p);cam.lookAt(x+Math.cos(a)*cp*100+sx,eye+Math.sin(p)*100+bob,z+Math.sin(a)*cp*100);
  const vm=G.vm,s=F.swingT>0?F.swingT/0.16:0;vm.visible=true;
  vm.userData.pivot.rotation.x=F.swingT>0?(-0.9+s*1.9):0.35+Math.sin(t*2)*0.03;
  vm.position.set(15,-15+bob*0.4,-30);vm.scale.setScalar(0.75);vm.userData.head.material.color.set(TIERS[S.anvil||0].c[1]);}
